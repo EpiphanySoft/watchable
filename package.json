@@ -1,0 +1,24 @@
+{
+  "name": "@epiphanysoft/watchable",
+  "version": "1.0.0-0",
+  "description": "Simple event firing ES6 class",
+  "main": "Watchable.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dongryphon/watchable.git"
+  },
+  "keywords": [
+    "event",
+    "watchable",
+    "observable"
+  ],
+  "author": "Don Griffin (dongryphon)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dongryphon/watchable/issues"
+  },
+  "homepage": "https://github.com/dongryphon/watchable#readme"
+}
