@@ -2,23 +2,34 @@
   "name": "@epiphanysoft/watchable",
   "version": "1.0.0-0",
   "description": "Simple event firing ES6 class",
+  "author": "Don Griffin (dongryphon)",
+  "license": "MIT",
+  "homepage": "https://github.com/EpiphanySoft/watchable#readme",
   "main": "Watchable.js",
-  "scripts": {
-    "test": "test"
+  "bugs": {
+    "url": "https://github.com/EpiphanySoft/watchable/issues"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/dongryphon/watchable.git"
+  "devDependencies": {
+    "assertly": "^1.0.2",
+    "mocha": "^3.5.3"
+  },
+  "directories": {
+    "bin": "./bin",
+    "doc": "./doc",
+    "lib": "./lib",
+    "man": "./man"
   },
   "keywords": [
     "event",
     "watchable",
     "observable"
   ],
-  "author": "Don Griffin (dongryphon)",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/dongryphon/watchable/issues"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EpiphanySoft/watchable.git"
   },
-  "homepage": "https://github.com/dongryphon/watchable#readme"
+  "scripts": {
+    "debug": "devtool node_modules/mocha/bin/_mocha -qc -- ./test/specs/**/*.js",
+    "test": "mocha ./test/specs/**/*.js"
+  }
 }

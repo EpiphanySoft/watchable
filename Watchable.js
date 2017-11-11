@@ -30,13 +30,18 @@ class Destroyer {
             for (entry of this.entries) {
                 watchers = watcherMap[name = entry[2]];
 
-                if (watchers && (index = watchers.indexOf(entry)) > -1) {
-                    if (watchers[firingSym]) {
-                        watcherMap[name] = watchers = watchers.slice();
-                        watchers[firingSym] = 0;
-                    }
+                if (watchers && firingSym in watchers) {
+                    if ((index = watchers.indexOf(entry)) > -1) {
+                        if (watchers[firingSym]) {
+                            watcherMap[name] = watchers = watchers.slice();
+                            watchers[firingSym] = 0;
+                        }
 
-                    watchers.splice(index, 1);
+                        watchers.splice(index, 1);
+                    }
+                }
+                else if (watchers === entry) {
+                    watcherMap[name] = null;
                 }
             }
         }
@@ -44,14 +49,15 @@ class Destroyer {
 }
 
 function call (fn, scope, args) {
-    return fn.charAt ? scope[fn](...args) : fn.call(scope, ...args);
+    return scope ? (fn.charAt ? scope[fn](...args) : fn.call(scope, ...args)) : fn(...args);
 }
 
 function on (watcherMap, name, fn, scope, destroyer) {
     let watchers = watcherMap[name];
+    let added = [fn, scope];
     let actualFn, entry;
 
-    if (watchers) {
+    if (watchers && firingSym in watchers) {
         for (entry of watchers) {
             actualFn = entry[0];
             actualFn = actualFn[actualFnSym] || actualFn;
@@ -65,24 +71,35 @@ function on (watcherMap, name, fn, scope, destroyer) {
             watcherMap[name] = watchers = watchers.slice();
             watchers[firingSym] = 0;
         }
+
+        watchers.push(added);
     }
-    else {
-        watcherMap[name] = watchers = [];
+    else if (watchers) {
+        actualFn = watchers[0];
+        actualFn = actualFn[actualFnSym] || actualFn;
+
+        if (actualFn === fn && (scope ? watchers[1] === scope : !watchers[1])) {
+            return;
+        }
+
+        watcherMap[name] = watchers = [watchers, added];
         watchers[firingSym] = 0;
     }
-
-    watchers.push(entry = [fn, scope]);
+    else {
+        watcherMap[name] = added;
+    }
 
     if (destroyer) {
-        destroyer.entries.push(entry);
-        entry.push(name);
+        destroyer.entries.push(added);
+        added.push(name);
     }
 }
 
 function un (watcherMap, name, fn, scope) {
-    let entry, i, watchers = watcherMap[name];
+    let watchers = watcherMap[name];
+    let actualFn, entry, i;
 
-    if (watchers) {
+    if (watchers && firingSym in watchers) {
         if (watchers[firingSym]) {
             watcherMap[name] = watchers = watchers.slice();
             watchers[firingSym] = 0;
@@ -90,10 +107,21 @@ function un (watcherMap, name, fn, scope) {
 
         for (i = watchers.length; i-- > 0; ) {
             entry = watchers[i];
+            actualFn = entry[0];
+            actualFn = actualFn[actualFnSym] || actualFn;
 
-            if (entry[0] === fn && (scope ? entry[1] === scope : !entry[1])) {
+            if (actualFn === fn && (scope ? entry[1] === scope : !entry[1])) {
                 watchers.splice(i, 1);
+                break;  // duplicates are prevents by on()
             }
+        }
+    }
+    else if (watchers) {
+        actualFn = watchers[0];
+        actualFn = actualFn[actualFnSym] || actualFn;
+
+        if (actualFn === fn && (scope ? watchers[1] === scope : !watchers[1])) {
+            watcherMap[name] = null;
         }
     }
 }
@@ -111,8 +139,10 @@ function update (instance, updater, name, fn, scope) {
         instance[watchersSym] = watcherMap = new Empty();
     }
 
+    scope = scope || null;
+
     if (typeof name === 'string') {
-        updater(instance, watcherMap, name, fn, scope);
+        updater(watcherMap, name, fn, scope);
     }
     else {
         // "name" is a manifest object of watchers
@@ -122,7 +152,7 @@ function update (instance, updater, name, fn, scope) {
 
         for (let s of Object.keys(name)) {
             if (!Watchable.options[s]) {
-                updater(instance, watcherMap, s, name[s], scope, destroyer);
+                updater(watcherMap, s, name[s], scope, destroyer);
             }
         }
     }
@@ -149,7 +179,7 @@ class Watchable {
         let watchers = watcherMap && watcherMap[event];
         let ret;
 
-        if (watchers) {
+        if (watchers && firingSym in watchers) {
             ++watchers[firingSym];
 
             for (let entry of watchers) {
@@ -160,6 +190,11 @@ class Watchable {
             }
 
             --watchers[firingSym];
+        }
+        else if (watchers) {
+            if (call(watchers[0], watchers[1], args) === STOP) {
+                ret = STOP;
+            }
         }
 
         return ret;
@@ -173,7 +208,7 @@ class Watchable {
         const me = this;
 
         function onceFn (...args) {
-            update(me, un, name, onceFn, scope);
+            update(me, un, name, fn, scope);
             call(fn, scope, args);
         }
 
