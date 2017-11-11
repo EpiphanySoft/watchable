@@ -3,7 +3,7 @@
 const actualFnSym = Symbol('actualListener');
 const firingSym = Symbol('eventFiring');
 const watchersSym = Symbol('eventWatchers');
-const STOP = Object.freeze({});
+const STOP = Symbol('stopFiring');
 
 function Empty (props) {
     if (props) {
@@ -229,7 +229,9 @@ class Watchable {
 let proto = Watchable.prototype;
 
 for (let name of Object.getOwnPropertyNames(proto)) {
-    descriptors[name] = Object.getOwnPropertyDescriptor(proto, name);
+    if (name !== 'constructor') {
+        descriptors[name] = Object.getOwnPropertyDescriptor(proto, name);
+    }
 }
 
 Watchable.options = new Empty({
