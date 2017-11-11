@@ -15,7 +15,7 @@ Empty.prototype = Object.create(null);
 
 //----------------------------------------
 
-class Destroyer {
+class Token {
     constructor (instance) {
         this.watchable = instance;
         this.entries = [];
@@ -23,6 +23,7 @@ class Destroyer {
 
     destroy () {
         let instance = this.watchable;
+        let inform = instance.onEventUnwatch;
         let watcherMap = instance[watchersSym];
         let entry, index, name, watchers;
 
@@ -37,11 +38,20 @@ class Destroyer {
                             watchers[firingSym] = 0;
                         }
 
-                        watchers.splice(index, 1);
+                        if (watchers.length > 1) {
+                            watchers.splice(index, 1);
+                        }
+                        else {
+                            watcherMap[name] = null;
+                        }
                     }
                 }
                 else if (watchers === entry) {
                     watcherMap[name] = null;
+                }
+
+                if (instance.onEventUnwatch && !watcherMap[name]) {
+                    instance.onEventUnwatch(name);
                 }
             }
         }
@@ -52,12 +62,13 @@ function call (fn, scope, args) {
     return scope ? (fn.charAt ? scope[fn](...args) : fn.call(scope, ...args)) : fn(...args);
 }
 
-function on (watcherMap, name, fn, scope, destroyer) {
+function on (instance, watcherMap, name, fn, scope, token) {
     let watchers = watcherMap[name];
     let added = [fn, scope];
     let actualFn, entry;
 
     if (watchers && firingSym in watchers) {
+        // Ignore duplicate registrations
         for (entry of watchers) {
             actualFn = entry[0];
             actualFn = actualFn[actualFnSym] || actualFn;
@@ -87,41 +98,57 @@ function on (watcherMap, name, fn, scope, destroyer) {
     }
     else {
         watcherMap[name] = added;
+
+        if (instance.onEventWatch) {
+            instance.onEventWatch(name);
+        }
     }
 
-    if (destroyer) {
-        destroyer.entries.push(added);
+    if (token) {
+        token.entries.push(added);
         added.push(name);
     }
 }
 
-function un (watcherMap, name, fn, scope) {
+function un (instance, watcherMap, name, fn, scope) {
     let watchers = watcherMap[name];
     let actualFn, entry, i;
 
-    if (watchers && firingSym in watchers) {
-        if (watchers[firingSym]) {
-            watcherMap[name] = watchers = watchers.slice();
-            watchers[firingSym] = 0;
-        }
+    if (watchers) {
+        if (firingSym in watchers) {
+            if (watchers[firingSym]) {
+                watcherMap[name] = watchers = watchers.slice();
+                watchers[firingSym] = 0;
+            }
 
-        for (i = watchers.length; i-- > 0; ) {
-            entry = watchers[i];
-            actualFn = entry[0];
-            actualFn = actualFn[actualFnSym] || actualFn;
+            for (i = watchers.length; i-- > 0;) {
+                entry = watchers[i];
+                actualFn = entry[0];
+                actualFn = actualFn[actualFnSym] || actualFn;
 
-            if (actualFn === fn && (scope ? entry[1] === scope : !entry[1])) {
-                watchers.splice(i, 1);
-                break;  // duplicates are prevents by on()
+                if (actualFn === fn && (scope ? entry[1] === scope : !entry[1])) {
+                    if (watchers.length > 1) {
+                        watchers.splice(i, 1);
+                    }
+                    else {
+                        watcherMap[name] = null;
+                    }
+
+                    break;  // duplicates are prevents by on()
+                }
             }
         }
-    }
-    else if (watchers) {
-        actualFn = watchers[0];
-        actualFn = actualFn[actualFnSym] || actualFn;
+        else {
+            actualFn = watchers[0];
+            actualFn = actualFn[actualFnSym] || actualFn;
 
-        if (actualFn === fn && (scope ? watchers[1] === scope : !watchers[1])) {
-            watcherMap[name] = null;
+            if (actualFn === fn && (scope ? watchers[1] === scope : !watchers[1])) {
+                watcherMap[name] = null;
+            }
+        }
+
+        if (instance.onEventUnwatch && !watcherMap[name]) {
+            instance.onEventUnwatch(name);
         }
     }
 }
@@ -129,11 +156,11 @@ function un (watcherMap, name, fn, scope) {
 function update (instance, updater, name, fn, scope) {
     let watcherMap = instance[watchersSym];
     let add = updater === on;
-    let destroyer = null;
+    let token = null;
 
     if (!watcherMap) {
         if (!add) {
-            return destroyer;
+            return token;
         }
 
         instance[watchersSym] = watcherMap = new Empty();
@@ -142,22 +169,22 @@ function update (instance, updater, name, fn, scope) {
     scope = scope || null;
 
     if (typeof name === 'string') {
-        updater(watcherMap, name, fn, scope);
+        updater(instance, watcherMap, name, fn, scope);
     }
     else {
         // "name" is a manifest object of watchers
 
-        destroyer = add && new Destroyer(instance);
+        token = add && new Token(instance);
         scope = name.scope;
 
         for (let s of Object.keys(name)) {
             if (!Watchable.options[s]) {
-                updater(watcherMap, s, name[s], scope, destroyer);
+                updater(instance, watcherMap, s, name[s], scope, token);
             }
         }
     }
 
-    return destroyer;
+    return token;
 }
 
 //----------------------------------------
@@ -165,9 +192,57 @@ function update (instance, updater, name, fn, scope) {
 const descriptors = {};
 
 class Watchable {
+    static allOff (instance, event) {
+        proto.unAll.call(instance, event);
+    }
+
     static applyTo (target) {
         Object.defineProperties(target, descriptors);
         target[watchersSym] = null;
+    }
+
+    static hasListeners (instance, event) {
+        return proto.hasListeners.call(instance, event);
+    }
+
+    static unify (inst1, inst2) {
+        let map1 = inst1[watchersSym];
+        let map2 = inst2[watchersSym];
+        let replacement, to;
+
+        if (map1) {
+            if (map2 && map1 !== map2) {
+                for (let event of Object.keys(map2)) {
+                    let from = map2[event];
+
+                    if (from) {
+                        if (!(to = map1[event])) {
+                            map1[event] = from;
+
+                            if (inst1.onEventWatch) {
+                                inst1.onEventWatch(event);
+                            }
+                        }
+                        else {
+                            let multiFrom = firingSym in from;
+
+                            map1[event] = replacement = (firingSym in to) ?
+                                (multiFrom ? [...to, ...from] : [...to, from]) :
+                                (multiFrom ? [to, ...from] : [to, from]);
+
+                            replacement[firingSym] = 0;
+                        }
+                    }
+                }
+            }
+
+            inst2[watchersSym] = map1;
+        }
+        else {
+            inst1[watchersSym] = map2 || (inst2[watchersSym] = new Empty());
+
+            //TODO if (inst1.onEventWatch)
+        }
     }
 
     emit (event, ...args) {
@@ -200,6 +275,11 @@ class Watchable {
         return ret;
     }
 
+    hasListeners (event) {
+        let watcherMap = this[watchersSym];
+        return !!(watcherMap && watcherMap[event]);
+    }
+
     on (name, fn, scope) {
         return update(this, on, name, fn, scope);
     }
@@ -224,6 +304,21 @@ class Watchable {
     un (name, fn, scope) {
         return update(this, un, name, fn, scope);
     }
+
+    unAll (event) {
+        let watcherMap = this[watchersSym];
+
+        if (event) {
+            if (watcherMap[event]) {
+                watcherMap[event] = null;
+            }
+        }
+        else {
+            for (let key of watcherMap) {
+                watcherMap[key] = null;
+            }
+        }
+    }
 }
 
 let proto = Watchable.prototype;
@@ -237,6 +332,12 @@ for (let name of Object.getOwnPropertyNames(proto)) {
 Watchable.options = new Empty({
     scope: true
 });
+
+Watchable.symbols = {
+    actualFn: actualFnSym,
+    firing:   firingSym,
+    watchers: watchersSym
+};
 
 Watchable.STOP = STOP;
 
