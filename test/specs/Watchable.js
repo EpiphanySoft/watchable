@@ -14,6 +14,10 @@ function defineSuite (T) {
     });
 
     describe('basics', function () {
+        it('should be recognized by Watchable.is()', function () {
+            expect(Watchable.is(this.obj)).to.be(true);
+        });
+
         it('should fire event to no listeners', function () {
             this.obj.fire('foo', 42);
         });

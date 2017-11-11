@@ -1,5 +1,7 @@
 'use strict';
 
+const Relayer = require('./Relayer.js');
+
 const actualFnSym = Symbol('actualListener');
 const firingSym = Symbol('eventFiring');
 const watchersSym = Symbol('eventWatchers');
@@ -19,6 +21,10 @@ class Token {
     constructor (instance) {
         this.watchable = instance;
         this.entries = [];
+    }
+
+    close () {
+        this.destroy();
     }
 
     destroy () {
@@ -205,6 +211,10 @@ class Watchable {
         return proto.hasListeners.call(instance, event);
     }
 
+    static is (instance) {
+        return instance && instance[watchersSym] !== undefined;
+    }
+
     static unify (inst1, inst2) {
         let map1 = inst1[watchersSym];
         let map2 = inst2[watchersSym];
@@ -272,6 +282,20 @@ class Watchable {
             }
         }
 
+        if (ret !== STOP) {
+            let relayers = this[Relayer.SYMBOL];
+
+            if (relayers) {
+                ++relayers[firingSym];
+
+                for (let relay of relayers) {
+                    relay.relay(event, args);
+                }
+
+                --relayers[firingSym];
+            }
+        }
+
         return ret;
     }
 
@@ -299,6 +323,34 @@ class Watchable {
 
     off (name, fn, scope) {
         return update(this, un, name, fn, scope);
+    }
+
+    /**
+        watchable.relayEvents(target);  // all event
+
+        watchable.relayEvents(target, [
+            'foo', 'bar'
+        ]);
+
+        watchable.relayEvents(target, {
+            foo: true,     // relayed as "foo"
+            bar: 'barish'  // relayed as "barish"
+        });
+
+        watchable.relayEvents(target, {
+            foo (event, args) {
+                // called to relay "event" to "target" with "args"
+                return target.fire(event, ...args);
+            }
+        });
+
+        watchable.relayEvents(target, (event, args) => {
+            // called to relay "event" to "target" with "args"
+            return target.fire(event, ...args);
+        });
+     */
+    relayEvents (target, options) {
+        return Relayer.create(this, target, options);
     }
 
     un (name, fn, scope) {
@@ -329,9 +381,13 @@ for (let name of Object.getOwnPropertyNames(proto)) {
     }
 }
 
+proto[watchersSym] = null;
+
 Watchable.options = new Empty({
     scope: true
 });
+
+Watchable.Relayer = Relayer;
 
 Watchable.symbols = {
     actualFn: actualFnSym,
