@@ -9,8 +9,8 @@ class Relayer {
     static create (source, target, options) {
         let relay = target;
 
-        if (relay) {
-            if (!relay.isEventRelayer) {
+        if (target) {
+            if (!target.isEventRelayer) {
                 relay = new Relayer(options);
                 relay.target = target;
             }
@@ -62,6 +62,10 @@ class Relayer {
         }
     }
 
+    and (options) {
+        return Relayer.create(this.source, this.target, options);
+    }
+
     close () {
         this.destroy();
     }
@@ -82,21 +86,21 @@ class Relayer {
     }
 
     relay (event, args) {
-        let entry = this.map;
-        let ret;
+        let map = this.map;
+        let entry, ret;
 
-        if (!entry) {
+        if (!map) {
             ret = this.target.fire(event, ...args);
         }
         else {
-            entry = entry[event];
+            entry = map[event] || map['*'];
 
             if (entry) {
                 if (typeof entry === 'function') {
                     ret = entry.call(this, event, args);
                 }
                 else {
-                    ret = this.target.fire(entry, ...args);
+                    ret = this.target.fire((entry === true) ? event : entry, ...args);
                 }
             }
         }

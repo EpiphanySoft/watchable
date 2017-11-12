@@ -225,41 +225,109 @@ are implemented.
 
 ## Relaying Events
 
-    inst1 = new Watchable();
-    inst2 = new Watchable();
+When relaying one event between watchable instances, there is always the manual solution:
 
-    // relay all events fired on inst1 to inst2:
-    inst1.relayEvents(inst2);
+    watchable1 = new Watchable();
+    watchable2 = new Watchable();
+    
+    watchable1.on({
+        foo (...args) {
+            watchable2.fire('foo', ...args);
+        }
+    });
 
-    // relay 'foo' and 'bar' events fired on inst1 to inst2:
-    inst1.relayEvents(inst2, [
+To relay all events fired by `watchable1`, however, requires a different approach:
+
+    watchable1.relayEvents(watchable2);
+
+This creates an event relayer (an instance of `Relayer`) and registers it with
+`watchable1`.
+
+This relayer can be later removed:
+
+    let token = watchable1.relayEvents(watchable2);
+    
+    // ...
+    
+    token.destroy();
+
+To relay multiple events, but not all events, `relayEvents` accepts an `options` argument:
+
+    watchable1.relayEvents(watchable2, [
         'foo', 'bar'
     ]);
 
-    // relay 'foo' as-is but rename 'bar' to 'barish':
-    inst1.relayEvents(inst2, {
+When `options` is an array, it is understood as an array of event names to relay. In this
+case, only these events will be relayed.
+
+The `options` argument can be an object whose keys are event names. The value can be
+used to rename or transform individual events.
+
+To relay `foo` without modification but rename the `bar` event to `barish`:
+
+    watchable1.relayEvents(watchable2, {
         foo: true,
         bar: 'barish'
     });
 
-    // relay only 'foo' event with fn transformation:
-    inst1.relayEvents(inst2, {
-        foo (event, args) {
-            return inst2.fire(event, ...args);
+To instead transform the `bar` event:
+
+    watchable1.relayEvents(watchable2, {
+        foo: true,
+        
+        bar (event, args) {
+            return watchable2.fire('barish', ...args);
         }
     });
 
-    // relay all events with a transformation
-    inst1.relayEvents(inst2, (event, args) => {
+To relay all events and only transform `bar`:
+
+    watchable1.relayEvents(watchable2, {
+        '*': true,
+        
+        bar (event, args) {
+            return watchable2.fire('barish', ...args);
+        }
+    });
+
+To transform all events, `options` can be a function:
+
+    watchable1.relayEvents(watchable2, (event, args) => {
         return target.fire(event, ...args);
     });
 
+For maximum flexibility, a custom relayer class can be written:
+
+    const { Relayer, Watchable } = require('@epiphanysoft/watchable');
+
+    class MyRelayer extends Relayer {
+        constructor (target) {
+            super();
+            this.target = target;
+        }
+        
+        relay (event, args) {
+            //...
+        }
+    }
+
+    watchable1.relayEvents(new MyRelayer(watchable2));
+
+In this case, `watchable1` will call the `relay()` method for all events it fires. The
+`relay` method can then decide all the particulars.
+
 ## Utility Methods
 
-The `Watchable` class has several `static` methods that are also directly exported for
-convenience:
+The `watchable` provides several helper functions that are directly exported. These are
+mostly to mimic the `event-emitter` API since many equivalent capabilities are available
+as described above.
 
-    const { hasListeners, is, unAll, unify } = require('@epiphanysoft/watchable');
+These methods are:
+
+    const { hasListeners, is, pipe, unAll, unify } = require('@epiphanysoft/watchable');
+
+The `hasListeners` and `unAll` methods are also available as instance methods of watchable
+objects.
 
 ### hasListeners
 
@@ -272,6 +340,17 @@ Returns `true` if the `watchable` instance has one ore more listeners for `event
     is (candidate);
 
 Returns `true` if the `candidate` is a watchable object.
+
+### pipe
+
+    pipe (watchable1, watchable2);
+
+Relays all events fired on `watchable1` to `watchable2`. This is an `event-emitter` name
+for the `relayEvents` method described above:
+
+    pipe (watchable1, watchable2) {
+        return watchable1.relayEvents(watchable2);
+    }
 
 ### unAll
 

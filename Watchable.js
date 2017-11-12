@@ -356,8 +356,6 @@ Watchable.options = new Empty({
     this: true
 });
 
-Watchable.Relayer = Relayer;
-
 Watchable.symbols = {
     actualFn: actualFnSym,
     firing:   firingSym,
@@ -371,10 +369,15 @@ function makeWatchable (target) {
     target[watchersSym] = null;
 }
 
+makeWatchable.Relayer = Relayer;
 makeWatchable.Watchable = Watchable;
 makeWatchable.hasListeners = Watchable.hasListeners;
 makeWatchable.is = Watchable.is;
 makeWatchable.unAll = Watchable.unAll;
 makeWatchable.unify = Watchable.unify;
+
+makeWatchable.pipe = function (watchable1, watchable2) {
+    return watchable1.relayEvents(watchable2);
+};
 
 module.exports = makeWatchable;
