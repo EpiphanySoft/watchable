@@ -20,7 +20,7 @@ Empty.prototype = Object.create(null);
 class Token {
     constructor (instance) {
         this.watchable = instance;
-        this.entries = [];
+        this.listeners = [];
     }
 
     close () {
@@ -31,14 +31,14 @@ class Token {
         let instance = this.watchable;
         let inform = instance.onEventUnwatch;
         let watcherMap = instance[watchersSym];
-        let entry, index, name, watchers;
+        let listener, index, name, watchers;
 
         if (watcherMap) {
-            for (entry of this.entries) {
-                watchers = watcherMap[name = entry[2]];
+            for (listener of this.listeners) {
+                watchers = watcherMap[name = listener[3]];
 
                 if (watchers && firingSym in watchers) {
-                    if ((index = watchers.indexOf(entry)) > -1) {
+                    if ((index = watchers.indexOf(listener)) > -1) {
                         if (watchers[firingSym]) {
                             watcherMap[name] = watchers = watchers.slice();
                             watchers[firingSym] = 0;
@@ -52,7 +52,7 @@ class Token {
                         }
                     }
                 }
-                else if (watchers === entry) {
+                else if (watchers === listener) {
                     watcherMap[name] = null;
                 }
 
@@ -64,22 +64,34 @@ class Token {
     }
 }
 
-function call (fn, scope, args) {
-    return scope ? (fn.charAt ? scope[fn](...args) : fn.call(scope, ...args)) : fn(...args);
+function invoke (instance, listener, args) {
+    let [ fn, scope, resolve ] = listener;
+    let it = resolve ? instance.resolveListenerScope(scope, fn, listener) : scope;
+
+    return fn.charAt ? it[fn](...args) : (it ? fn.apply(it, args) : fn(...args));
+}
+
+function match (listener, fn, scope) {
+    let [ lfn, lsc ] = listener;
+    return fn === (lfn[actualFnSym] || lfn) && (scope ? lsc === scope : !lsc);
 }
 
 function on (instance, watcherMap, name, fn, scope, token) {
     let watchers = watcherMap[name];
-    let added = [fn, scope];
-    let actualFn, entry;
+    let listener = [ fn, scope ];
+    let candidate;
+
+    if (typeof scope === 'string' || (fn.charAt && !scope)) {
+        if (!instance.resolveListenerScope) {
+            throw new Error('Watchable instance does not support scope resolution');
+        }
+        listener[2] = true;
+    }
 
     if (watchers && firingSym in watchers) {
         // Ignore duplicate registrations
-        for (entry of watchers) {
-            actualFn = entry[0];
-            actualFn = actualFn[actualFnSym] || actualFn;
-
-            if (actualFn === fn && (scope ? entry[1] === scope : !entry[1])) {
+        for (candidate of watchers) {
+            if (match(candidate, fn, scope)) {
                 return;
             }
         }
@@ -89,21 +101,18 @@ function on (instance, watcherMap, name, fn, scope, token) {
             watchers[firingSym] = 0;
         }
 
-        watchers.push(added);
+        watchers.push(listener);
     }
     else if (watchers) {
-        actualFn = watchers[0];
-        actualFn = actualFn[actualFnSym] || actualFn;
-
-        if (actualFn === fn && (scope ? watchers[1] === scope : !watchers[1])) {
+        if (match(watchers, fn, scope)) {
             return;
         }
 
-        watcherMap[name] = watchers = [watchers, added];
+        watcherMap[name] = watchers = [watchers, listener];
         watchers[firingSym] = 0;
     }
     else {
-        watcherMap[name] = added;
+        watcherMap[name] = listener;
 
         if (instance.onEventWatch) {
             instance.onEventWatch(name);
@@ -111,14 +120,14 @@ function on (instance, watcherMap, name, fn, scope, token) {
     }
 
     if (token) {
-        token.entries.push(added);
-        added.push(name);
+        token.listeners.push(listener);
+        listener[3] = name;
     }
 }
 
 function un (instance, watcherMap, name, fn, scope) {
     let watchers = watcherMap[name];
-    let actualFn, entry, i;
+    let i;
 
     if (watchers) {
         if (firingSym in watchers) {
@@ -128,11 +137,7 @@ function un (instance, watcherMap, name, fn, scope) {
             }
 
             for (i = watchers.length; i-- > 0;) {
-                entry = watchers[i];
-                actualFn = entry[0];
-                actualFn = actualFn[actualFnSym] || actualFn;
-
-                if (actualFn === fn && (scope ? entry[1] === scope : !entry[1])) {
+                if (match(watchers[i], fn, scope)) {
                     if (watchers.length > 1) {
                         watchers.splice(i, 1);
                     }
@@ -144,13 +149,8 @@ function un (instance, watcherMap, name, fn, scope) {
                 }
             }
         }
-        else {
-            actualFn = watchers[0];
-            actualFn = actualFn[actualFnSym] || actualFn;
-
-            if (actualFn === fn && (scope ? watchers[1] === scope : !watchers[1])) {
-                watcherMap[name] = null;
-            }
+        else if (match(watchers, fn, scope)) {
+            watcherMap[name] = null;
         }
 
         if (instance.onEventUnwatch && !watcherMap[name]) {
@@ -181,7 +181,7 @@ function update (instance, updater, name, fn, scope) {
         // "name" is a manifest object of watchers
 
         token = add && new Token(instance);
-        scope = name.scope;
+        scope = name.this;
 
         for (let s of Object.keys(name)) {
             if (!Watchable.options[s]) {
@@ -198,21 +198,16 @@ function update (instance, updater, name, fn, scope) {
 const descriptors = {};
 
 class Watchable {
-    static allOff (instance, event) {
-        proto.unAll.call(instance, event);
-    }
-
-    static applyTo (target) {
-        Object.defineProperties(target, descriptors);
-        target[watchersSym] = null;
-    }
-
     static hasListeners (instance, event) {
         return proto.hasListeners.call(instance, event);
     }
 
     static is (instance) {
         return instance && instance[watchersSym] !== undefined;
+    }
+
+    static unAll (instance, event) {
+        proto.unAll.call(instance, event);
     }
 
     static unify (inst1, inst2) {
@@ -267,8 +262,8 @@ class Watchable {
         if (watchers && firingSym in watchers) {
             ++watchers[firingSym];
 
-            for (let entry of watchers) {
-                if (call(entry[0], entry[1], args) === STOP) {
+            for (let listener of watchers) {
+                if (invoke(this, listener, args) === STOP) {
                     ret = STOP;
                     break;
                 }
@@ -277,7 +272,7 @@ class Watchable {
             --watchers[firingSym];
         }
         else if (watchers) {
-            if (call(watchers[0], watchers[1], args) === STOP) {
+            if (invoke(this, watchers, args) === STOP) {
                 ret = STOP;
             }
         }
@@ -313,7 +308,7 @@ class Watchable {
 
         function onceFn (...args) {
             update(me, un, name, fn, scope);
-            call(fn, scope, args);
+            invoke(me, [fn, scope], args);
         }
 
         onceFn[actualFnSym] = fn;
@@ -325,30 +320,6 @@ class Watchable {
         return update(this, un, name, fn, scope);
     }
 
-    /**
-        watchable.relayEvents(target);  // all event
-
-        watchable.relayEvents(target, [
-            'foo', 'bar'
-        ]);
-
-        watchable.relayEvents(target, {
-            foo: true,     // relayed as "foo"
-            bar: 'barish'  // relayed as "barish"
-        });
-
-        watchable.relayEvents(target, {
-            foo (event, args) {
-                // called to relay "event" to "target" with "args"
-                return target.fire(event, ...args);
-            }
-        });
-
-        watchable.relayEvents(target, (event, args) => {
-            // called to relay "event" to "target" with "args"
-            return target.fire(event, ...args);
-        });
-     */
     relayEvents (target, options) {
         return Relayer.create(this, target, options);
     }
@@ -360,15 +331,13 @@ class Watchable {
     unAll (event) {
         let watcherMap = this[watchersSym];
 
-        if (event) {
-            if (watcherMap[event]) {
-                watcherMap[event] = null;
-            }
-        }
-        else {
+        if (!event) {
             for (let key of watcherMap) {
                 watcherMap[key] = null;
             }
+        }
+        else if (watcherMap[event]) {
+            watcherMap[event] = null;
         }
     }
 }
@@ -384,7 +353,7 @@ for (let name of Object.getOwnPropertyNames(proto)) {
 proto[watchersSym] = null;
 
 Watchable.options = new Empty({
-    scope: true
+    this: true
 });
 
 Watchable.Relayer = Relayer;
@@ -397,4 +366,15 @@ Watchable.symbols = {
 
 Watchable.STOP = STOP;
 
-module.exports = Watchable;
+function makeWatchable (target) {
+    Object.defineProperties(target, descriptors);
+    target[watchersSym] = null;
+}
+
+makeWatchable.Watchable = Watchable;
+makeWatchable.hasListeners = Watchable.hasListeners;
+makeWatchable.is = Watchable.is;
+makeWatchable.unAll = Watchable.unAll;
+makeWatchable.unify = Watchable.unify;
+
+module.exports = makeWatchable;
