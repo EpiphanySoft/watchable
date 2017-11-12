@@ -1,10 +1,11 @@
 'use strict';
 
 const expect = require('assertly').expect;
-const Watchable = require('../Watchable.js').Watchable;
+
+const { is, STOP, symbols } = require('../Watchable.js');
+const unify = require('../unify.js');
 
 function defineSuite (T) {
-    const STOP = T.STOP;
     let K = 0;
 
     beforeEach(function () {
@@ -13,8 +14,8 @@ function defineSuite (T) {
     });
 
     describe('basics', function () {
-        it('should be recognized by Watchable.is()', function () {
-            expect(Watchable.is(this.obj)).to.be(true);
+        it('should be recognized by is()', function () {
+            expect(is(this.obj)).to.be(true);
         });
 
         it('should fire event to no listeners', function () {
@@ -1079,7 +1080,7 @@ function defineSuite (T) {
             this.obj2.on('m-m', this.f2h = () => { calls.push('f2h') });
             this.obj2.on('m-m', this.f2i = () => { calls.push('f2i') });
 
-            Watchable.unify(this.obj, this.obj2);
+            unify(this.obj, this.obj2);
         });
 
         describe('from zero listeners', function () {
@@ -1088,8 +1089,8 @@ function defineSuite (T) {
                     expect(this.obj.hasListeners('z-o')).to.be(true);
                     expect(this.obj2.hasListeners('z-o')).to.be(true);
 
-                    expect(this.obj[Watchable.symbols.watchers] ===
-                           this.obj2[Watchable.symbols.watchers]).to.be(true);
+                    expect(this.obj[symbols.watchers] ===
+                           this.obj2[symbols.watchers]).to.be(true);
 
                     this.obj.fire('z-o');
                     expect(calls).to.equal([ 'f2a' ]);
@@ -1451,7 +1452,7 @@ function defineSuite (T) {
                 bar () { calls.push('bar') }
             });
 
-            Watchable.unify(this.obj, this.obj2);
+            unify(this.obj, this.obj2);
         });
 
         it('should merge', function () {

@@ -1,9 +1,8 @@
 'use strict';
 
-const relayersSym = Symbol('eventRelayers');
+const Empty = require('./Empty.js');
 
-function Empty (props) {}
-Empty.prototype = Object.create(null);
+const relayersSym = Symbol('eventRelayers');
 
 class Relayer {
     static create (source, target, options) {
@@ -60,10 +59,6 @@ class Relayer {
                 }
             }
         }
-    }
-
-    and (options) {
-        return Relayer.create(this.source, this.target, options);
     }
 
     close () {

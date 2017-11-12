@@ -1,6 +1,25 @@
 # watchable
 
-An enhanced event firing solution similar to `event-emitter`.
+An enhanced event firing solution similar to `event-emitter`. While `watchable` can be
+(almost) a drop-in replacement for `event-emitter`, its goal is to provide a better API
+for doing more involved work.
+
+For example:
+
+    // Listen to "foo", "bar" and "zap" events:
+    
+    let token = watchable.on({
+        foo () { /* ... */ },
+        bar () { /* ... */ },
+        zap () { /* ... */ }
+    });
+    
+    // ...
+    
+    // Now remove all 3 listeners:
+    token.destroy();
+
+This is just one of the API improvements. There are many more described below!
 
 ## Substitution
 
@@ -296,7 +315,8 @@ To transform all events, `options` can be a function:
         return target.fire(event, ...args);
     });
 
-For maximum flexibility, a custom relayer class can be written:
+For maximum flexibility, a custom relayer class can be written and an instance passed as
+the first and only parameter to `relayEvents`:
 
     const { Relayer, Watchable } = require('@epiphanysoft/watchable');
 
@@ -314,7 +334,7 @@ For maximum flexibility, a custom relayer class can be written:
     watchable1.relayEvents(new MyRelayer(watchable2));
 
 In this case, `watchable1` will call the `relay()` method for all events it fires. The
-`relay` method can then decide all the particulars.
+`relay` method can then decide the particulars.
 
 ## Utility Methods
 
@@ -379,3 +399,24 @@ current group members as the first argument:
     unify (watchable3, watchable2);
 
 This is because preference is given to the first watchable object when merging.
+
+# Extending Watchable
+
+For all of its features, `watchable` is rather small so there is room for enhancement by
+other modules.
+
+To facilitate such enhancements, the entire Mocha test suite is exported to allow such
+modules to verify compliance with the full `watchable` interface contract:
+
+    const { Watchable } = require('@epiphanysoft/watchable');
+
+    class MyWatchable extends Watchable {
+    }
+
+    //---
+
+    const watchableTestSuite = require('@epiphanysoft/watchable/test/suite');
+
+    describe('MyWatchable', function () {
+        watchableTestSuite(MyWatchable);
+    });
