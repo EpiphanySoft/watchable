@@ -1,7 +1,6 @@
 'use strict';
 
-const Empty = require('./Empty.js');
-const { symbols } = require('./Watchable.js');
+const { Empty, symbols } = require('./common.js');
 
 const firingSym = symbols.firing;
 const watchersSym = symbols.watchers;

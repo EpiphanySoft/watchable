@@ -255,12 +255,24 @@ When relaying one event between watchable instances, there is always the manual 
         }
     });
 
-To relay all events fired by `watchable1`, however, requires a different approach:
+To relay all events fired by `watchable1`, however, requires a different approach. The
+solution provided by `watchable` is an event relayer:
 
+    const relayEvents = require('@epiphanysoft/watchable/relay');
+
+The above require returns a function that can be used to create event relayers but it also
+enables the latent `relayEvents` provided by all watchable instances.
+
+These are equivalent:
+
+    relayEvents(watchable1, watchable2);
+    
     watchable1.relayEvents(watchable2);
 
-This creates an event relayer (an instance of `Relayer`) and registers it with
-`watchable1`.
+They both creates an event relayer and registers it with `watchable1`. The second form is
+generally preferred since most of the operations provided by `watchable` are instance
+methods. Basically, as long as some module issues a `require('.../watchable/relay)` then
+the `relayEvent` method (already defined on all watchable objects) will work properly.
 
 This relayer can be later removed:
 
@@ -344,7 +356,9 @@ as described above.
 
 These methods are:
 
-    const { hasListeners, is, pipe, unAll, unify } = require('@epiphanysoft/watchable');
+    const { hasListeners, is, unAll } = require('@epiphanysoft/watchable');
+    const pipe = require('@epiphanysoft/watchable/pipe');
+    const unify = require('@epiphanysoft/watchable/unify');
 
 The `hasListeners` and `unAll` methods are also available as instance methods of watchable
 objects.

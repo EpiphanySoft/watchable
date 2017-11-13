@@ -20,7 +20,9 @@
     "man": "./man"
   },
   "keywords": [
+    "emitter",
     "event",
+    "event-emitter",
     "watchable",
     "observable"
   ],

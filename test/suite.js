@@ -5,6 +5,8 @@ const expect = require('assertly').expect;
 const { is, STOP, symbols } = require('../Watchable.js');
 const unify = require('../unify.js');
 
+require('../relay.js');  // enable relayEvents() method
+
 function defineSuite (T) {
     let K = 0;
 
@@ -35,6 +37,109 @@ function defineSuite (T) {
 
             expect(arg).to.be(42);
             expect(that).to.be(scope);
+        });
+
+        it('should fire event with multiple arguments', function () {
+            let args = [];
+
+            this.obj.on('foo', function (...a) {
+                args.push(a.length);
+                args.push(...a);
+            });
+
+            this.obj.fire('foo');
+            expect(args).to.equal([ 0 ]);
+
+            args = [];
+            this.obj.fire('foo', 42);
+            expect(args).to.equal([ 1, 42 ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc');
+            expect(args).to.equal([ 2, 42, 'abc' ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123);
+            expect(args).to.equal([ 3, 42, 'abc', 123 ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123, 'xyz');
+            expect(args).to.equal([ 4, 42, 'abc', 123, 'xyz' ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123, 'xyz', -12);
+            expect(args).to.equal([ 5, 42, 'abc', 123, 'xyz', -12 ]);
+        });
+
+        it('should fire event with multiple arguments w/scope', function () {
+            let args = [];
+            let scope = { a: 'woot' };
+
+            this.obj.on('foo', function (...a) {
+                args.push(this.a);
+                args.push(a.length);
+                args.push(...a);
+            }, scope);
+
+            this.obj.fire('foo');
+            expect(args).to.equal([ 'woot', 0 ]);
+
+            args = [];
+            this.obj.fire('foo', 42);
+            expect(args).to.equal([ 'woot', 1, 42 ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc');
+            expect(args).to.equal([ 'woot', 2, 42, 'abc' ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123);
+            expect(args).to.equal([ 'woot', 3, 42, 'abc', 123 ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123, 'xyz');
+            expect(args).to.equal([ 'woot', 4, 42, 'abc', 123, 'xyz' ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123, 'xyz', -12);
+            expect(args).to.equal([ 'woot', 5, 42, 'abc', 123, 'xyz', -12 ]);
+        });
+
+        it('should fire event with multiple arguments w/named method', function () {
+            let args = [];
+            let scope = {
+                a: 'boot',
+                onFoo (...a) {
+                    args.push(this.a);
+                    args.push(a.length);
+                    args.push(...a);
+                }
+            };
+
+            this.obj.on('foo', 'onFoo', scope);
+
+            this.obj.fire('foo');
+            expect(args).to.equal([ 'boot', 0 ]);
+
+            args = [];
+            this.obj.fire('foo', 42);
+            expect(args).to.equal([ 'boot', 1, 42 ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc');
+            expect(args).to.equal([ 'boot', 2, 42, 'abc' ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123);
+            expect(args).to.equal([ 'boot', 3, 42, 'abc', 123 ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123, 'xyz');
+            expect(args).to.equal([ 'boot', 4, 42, 'abc', 123, 'xyz' ]);
+
+            args = [];
+            this.obj.fire('foo', 42, 'abc', 123, 'xyz', -12);
+            expect(args).to.equal([ 'boot', 5, 42, 'abc', 123, 'xyz', -12 ]);
         });
 
         it('should fire event to named listener', function () {
@@ -788,6 +893,28 @@ function defineSuite (T) {
                     this: 'that'
                 });
             }).to.throw('Watchable instance does not support scope resolution');
+        });
+    });
+
+    describe('event relay', function () {
+        beforeEach(function () {
+            this.obj2 = new T();
+        });
+
+        it('should relay all events by default', function () {
+            this.obj.relayEvents(this.obj2);
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427']);
         });
     });
 

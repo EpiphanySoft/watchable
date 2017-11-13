@@ -1,18 +1,18 @@
 'use strict';
 
-const Empty = require('./Empty.js');
-const Relayer = require('./Relayer.js');
+const { Empty, getDescriptors, symbols } = require('./common.js');
 
-const actualFnSym = Symbol('actualListener');
-const firingSym = Symbol('eventFiring');
-const watchersSym = Symbol('eventWatchers');
-const STOP = Symbol('stopFiring');
+const actualSym   = symbols.actual;
+const firingSym   = symbols.firing;
+const relayersSym = symbols.relayers;
+const watchersSym = symbols.watchers;
+const STOP        = symbols.STOP;
 
 //----------------------------------------
 
 class Token {
     constructor (instance) {
-        this.watchable = instance;
+        this.instance = instance;
         this.listeners = [];
     }
 
@@ -21,8 +21,7 @@ class Token {
     }
 
     destroy () {
-        let instance = this.watchable;
-        let inform = instance.onEventUnwatch;
+        let instance = this.instance;
         let watcherMap = instance[watchersSym];
         let listener, index, name, watchers;
 
@@ -60,26 +59,46 @@ class Token {
 function invoke (instance, listener, args) {
     let [ fn, scope, resolve ] = listener;
     let it = resolve ? instance.resolveListenerScope(scope, fn, listener) : scope;
+    let isStr = fn.charAt, x = args[0], y = args[1], z = args[2];
 
-    return fn.charAt ? it[fn](...args) : (it ? fn.apply(it, args) : fn(...args));
+    // fn.apply() and fn(...args) are notably slower then fn() and fn.call()
+    switch (args.length) {
+    case 0:
+        return isStr ? it[fn]() : (it ? fn.call(it) : fn());
+    case 1:
+        return isStr ? it[fn](x) : (it ? fn.call(it, x) : fn(x));
+    case 2:
+        return isStr ? it[fn](x, y) : (it ? fn.call(it, x, y) : fn(x, y));
+    case 3:
+        return isStr ? it[fn](x, y, z) : (it ? fn.call(it, x, y, z) : fn(x, y, z));
+    }
+
+    return (isStr ? it[fn] : fn).apply(it, args);
 }
 
-function match (listener, fn, scope) {
-    let [ lfn, lsc ] = listener;
-    return fn === (lfn[actualFnSym] || lfn) && (scope ? lsc === scope : !lsc);
-}
-
-function on (instance, watcherMap, name, fn, scope, token) {
-    let watchers = watcherMap[name];
+function listen (instance, fn, scope) {
     let listener = [ fn, scope ];
-    let candidate;
 
     if (typeof scope === 'string' || (fn.charAt && !scope)) {
         if (!instance.resolveListenerScope) {
             throw new Error('Watchable instance does not support scope resolution');
         }
+
         listener[2] = true;
     }
+
+    return listener;
+}
+
+function match (listener, fn, scope) {
+    let [ lfn, lsc ] = listener[0][actualSym] || listener;
+    return fn === lfn && (scope ? lsc === scope : !lsc);
+}
+
+function on (instance, watcherMap, name, fn, scope, token) {
+    let watchers = watcherMap[name];
+    let listener = listen(instance, fn, scope);
+    let candidate;
 
     if (watchers && firingSym in watchers) {
         // Ignore duplicate registrations
@@ -159,7 +178,7 @@ function update (instance, updater, name, fn, scope) {
 
     if (!watcherMap) {
         if (!add) {
-            return token;
+            return this;
         }
 
         instance[watchersSym] = watcherMap = new Empty();
@@ -183,12 +202,10 @@ function update (instance, updater, name, fn, scope) {
         }
     }
 
-    return token;
+    return token || this;
 }
 
 //----------------------------------------
-
-const descriptors = {};
 
 class Watchable {
     emit (event, ...args) {
@@ -198,7 +215,7 @@ class Watchable {
     fire (event, ...args) {
         let watcherMap = this[watchersSym];
         let watchers = watcherMap && watcherMap[event];
-        let ret;
+        let R, relayers, ret;
 
         if (watchers && firingSym in watchers) {
             ++watchers[firingSym];
@@ -218,18 +235,9 @@ class Watchable {
             }
         }
 
-        if (ret !== STOP) {
-            let relayers = this[Relayer.SYMBOL];
-
-            if (relayers) {
-                ++relayers[firingSym];
-
-                for (let relay of relayers) {
-                    relay.relay(event, args);
-                }
-
-                --relayers[firingSym];
-            }
+        R = (relayers = ret !== STOP && this[relayersSym]) && Watchable.Relayer;
+        if (R) {
+            ret = R.relay(relayers, event, args);
         }
 
         return ret;
@@ -245,16 +253,15 @@ class Watchable {
     }
 
     once (name, fn, scope) {
-        const me = this;
+        let actual = listen(this, fn, scope);
+        let onceFn = (...args) => {
+            update(this, un, name, fn, scope);
+            invoke(this, actual, args);
+        };
 
-        function onceFn (...args) {
-            update(me, un, name, fn, scope);
-            invoke(me, [fn, scope], args);
-        }
+        onceFn[actualSym] = actual;
 
-        onceFn[actualFnSym] = fn;
-
-        return update(me, on, name, onceFn, scope);
+        return update(this, on, name, onceFn);
     }
 
     off (name, fn, scope) {
@@ -262,7 +269,7 @@ class Watchable {
     }
 
     relayEvents (target, options) {
-        return Relayer.create(this, target, options);
+        return Watchable.Relayer.create(this, target, options);
     }
 
     un (name, fn, scope) {
@@ -280,16 +287,13 @@ class Watchable {
         else if (watcherMap[event]) {
             watcherMap[event] = null;
         }
+
+        return this;
     }
 }
 
-let proto = Watchable.prototype;
-
-for (let name of Object.getOwnPropertyNames(proto)) {
-    if (name !== 'constructor') {
-        descriptors[name] = Object.getOwnPropertyDescriptor(proto, name);
-    }
-}
+const proto = Watchable.prototype;
+const descriptors = getDescriptors(proto);
 
 proto[watchersSym] = null;
 
@@ -302,9 +306,9 @@ function morph (target) {
     target[watchersSym] = null;
 }
 
-morph.Relayer = Relayer;
 morph.STOP = STOP;
 morph.Watchable = Watchable;
+morph.symbols = symbols;
 
 morph.hasListeners = (instance, event) => {
     return proto.hasListeners.call(instance, event);
@@ -316,16 +320,6 @@ morph.is = (instance) => {
 
 morph.unAll = (instance, event) => {
     proto.unAll.call(instance, event);
-};
-
-morph.pipe = (watchable1, watchable2) => {
-    return watchable1.relayEvents(watchable2);
-};
-
-morph.symbols = {
-    actualFn: actualFnSym,
-    firing:   firingSym,
-    watchers: watchersSym
 };
 
 module.exports = morph;

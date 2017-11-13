@@ -1,8 +1,10 @@
 'use strict';
 
-const Empty = require('./Empty.js');
+const { Watchable } = require('./Watchable.js');
+const { Empty, symbols } = require('./common.js');
 
-const relayersSym = Symbol('eventRelayers');
+const firingSym = symbols.firing;
+const relayersSym = symbols.relayers;
 
 class Relayer {
     static create (source, target, options) {
@@ -33,6 +35,16 @@ class Relayer {
         }
 
         return relay;
+    }
+
+    static relay (relayers, event, args) {
+        ++relayers[firingSym];
+
+        for (let relay of relayers) {
+            relay.relay(event, args);
+        }
+
+        --relayers[firingSym];
     }
 
     constructor (config) {
@@ -106,6 +118,12 @@ class Relayer {
 
 Relayer.prototype.isEventRelayer = true;
 
-Relayer.SYMBOL = relayersSym;
+Watchable.Relayer = Relayer;
 
-module.exports = Relayer;
+function relay (watchable1, watchable2, options) {
+    return Relayer.create(watchable1, watchable2, options);
+}
+
+relay.Relayer = Relayer;
+
+module.exports = relay;
