@@ -96,7 +96,7 @@ listener methods:
     
     watchable.on('foo', onFoo', watcher);
 
-To removing a listener method you must supply the same instance:
+To remove a listener method you must supply the same instance:
 
     watchable.un('foo', onFoo', watcher);
 
@@ -140,7 +140,7 @@ passed to `un()` to remove all of the listeners, but there is an easier way:
     token.destroy();
 
 By destroying the returned token (which is the only method it supports), all of the
-listeners will be removed.
+corresponding listeners will be removed.
 
 The same applies to listener methods:
 
@@ -154,7 +154,7 @@ The same applies to listener methods:
 The special key `this` in the listener manifest is understood to be the target object
 of the listener methods.
 
-A listener manifest can contain a mixture of method names and functions, but that it is
+A listener manifest can contain a mixture of method names and functions, but it is
 generally best to use a consistent form at least on a per-call basis.
 
 ## Scope Resolution
@@ -196,36 +196,28 @@ mechanism. The object can be useful to the `resolveListenerScope` method for hol
 cached results on behalf of this particular listener. The `resolveListenerScope` method,
 however, should not do any of the following with the `listeners` object:
  
- - Add or remove array element.
+ - Add or remove array elements.
  - Change any of the array element values.
  - Depend on any of the array element values.
  - Overwrite any of the array prototype methods.
 
-Basically, `watchable` treats the `listeners` as the array it is and so long as that is
-preserved, the `resolveListenerScope` implementor is free to place expando properties on
-the same object for its own benefit.
+Basically, `watchable` treats the `listeners` as the array it is and so long as that view
+onto the object is preserved and handled as read-only, the `resolveListenerScope`
+implementor is free to place expando properties on the same object for its own benefit.
 
 ## Listener Detection and Notification
 
 Some expensive actions can be avoided using the `hasListeners` method:
 
-    class MyClass extends Watchable {
-        //...
+    if (watchable.hasListeners('change')) {
+        //... expensive stuff
 
-        stuff () {
-            // ...
-            
-            if (this.hasListeners('change')) {
-                //... expensive stuff
-        
-                this.fire('change');
-            }
-        }
+        watchable.fire('change');
     }
 
-Firing some events (say file-system observations) can come at some cost. In these cases
-it is helpful to know when listeners are added or removed so that these expensive setups
-can be delayed or avoided as well as cleaned up when no longer needed.
+Setting up to fire some events (say file-system observations) can come at a cost. In
+these cases it is helpful to know when listeners are added or removed so that these
+expensive setups can be delayed or avoided as well as cleaned up when no longer needed.
 
     class MyClass extends Watchable {
         //...
@@ -246,8 +238,8 @@ are implemented.
 
 When relaying one event between watchable instances, there is always the manual solution:
 
-    watchable1 = new Watchable();
-    watchable2 = new Watchable();
+    let watchable1 = new Watchable();
+    let watchable2 = new Watchable();
     
     watchable1.on({
         foo (...args) {
@@ -260,8 +252,9 @@ solution provided by `watchable` is an event relayer:
 
     const relayEvents = require('@epiphanysoft/watchable/relay');
 
-The above require returns a function that can be used to create event relayers but it also
-enables the latent `relayEvents` provided by all watchable instances.
+The above `require` returns a function that can be used to create event relayers but it
+also enables the latent `relayEvents` method which is already defined on all watchable
+objects.
 
 These are equivalent:
 
@@ -269,12 +262,12 @@ These are equivalent:
     
     watchable1.relayEvents(watchable2);
 
-They both creates an event relayer and registers it with `watchable1`. The second form is
+They both create an event relayer and register it with `watchable1`. The second form is
 generally preferred since most of the operations provided by `watchable` are instance
 methods. Basically, as long as some module issues a `require('.../watchable/relay)` then
-the `relayEvent` method (already defined on all watchable objects) will work properly.
+the `relayEvent` method on all watchable instance will work properly.
 
-This relayer can be later removed:
+Removing a relayer is similar to removing a listener manifest:
 
     let token = watchable1.relayEvents(watchable2);
     
@@ -291,8 +284,25 @@ To relay multiple events, but not all events, `relayEvents` accepts an `options`
 When `options` is an array, it is understood as an array of event names to relay. In this
 case, only these events will be relayed.
 
-The `options` argument can be an object whose keys are event names. The value can be
-used to rename or transform individual events.
+The `options` argument can be an object whose keys are event names. The following is
+equivalent to the array form above:
+
+    watchable1.relayEvents(watchable2, {
+        foo: true,
+        bar: true
+    });
+
+To relay all events except `bar`:
+
+    watchable1.relayEvents(watchable2, {
+        '*': true,
+        bar: false
+    });
+
+The special `'*'` pseudo event is used to change the default mapping of events not given
+in the `options` object.
+
+The values in the `options` object can be used to rename or transform individual events.
 
 To relay `foo` without modification but rename the `bar` event to `barish`:
 
@@ -321,7 +331,7 @@ To relay all events and only transform `bar`:
         }
     });
 
-To transform all events, `options` can be a function:
+To transform all events in one way, `options` can be a function:
 
     watchable1.relayEvents(watchable2, (event, args) => {
         return target.fire(event, ...args);
