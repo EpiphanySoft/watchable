@@ -5,7 +5,7 @@ const expect = require('assertly').expect;
 const { is, STOP, symbols } = require('../Watchable.js');
 const unify = require('../unify.js');
 
-require('../relay.js');  // enable relayEvents() method
+const { Relayer } = require('../relay.js');  // enable relayEvents() method
 
 function defineSuite (T) {
     let K = 0;
@@ -902,7 +902,7 @@ function defineSuite (T) {
         });
 
         it('should relay all events by default', function () {
-            this.obj.relayEvents(this.obj2);
+            let token = this.obj.relayEvents(this.obj2);
 
             let calls = [];
 
@@ -913,8 +913,270 @@ function defineSuite (T) {
 
             this.obj.fire('foo', 42);
             this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
 
-            expect(calls).to.equal([ 'foo=42', 'bar=427']);
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+        });
+
+        it('should relay events by name in array', function () {
+            let token = this.obj.relayEvents(this.obj2, [
+                'foo',
+                'bar'
+            ]);
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+        });
+
+        it('should relay events by name in object', function () {
+            let token = this.obj.relayEvents(this.obj2, {
+                foo: true,
+                bar: true
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+        });
+
+        it('should relay and rename events in object', function () {
+            let token = this.obj.relayEvents(this.obj2, {
+                foo: 'foob',
+                bar: true
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foob (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+        });
+
+        it('should relay all events except by name in object', function () {
+            let token = this.obj.relayEvents(this.obj2, {
+                '*': true,
+                zip: false
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+        });
+
+        it('should relay and transform events by name in object', function () {
+            let token = this.obj.relayEvents(this.obj2, {
+                '*': true,
+                zip (event, args) {
+                    this.target.fire('zoop', ...args);
+                }
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); },
+                zoop (x) { calls.push('zoop=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427', 'zoop=123' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427', 'zoop=123' ]);
+        });
+
+        it('should transform all events by arrow function', function () {
+            let token = this.obj.relayEvents(this.obj2, (event, args) => {
+                this.obj2.fire(event + 'p', ...args);
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); },
+
+                barp (x) { calls.push('barp=' + x); },
+                foop (x) { calls.push('foop=' + x); },
+                zipp (x) { calls.push('zipp=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
+        });
+
+        it('should transform all events by function', function () {
+            let token = this.obj.relayEvents(this.obj2, function (event, args) {
+                this.target.fire(event + 'p', ...args);
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); },
+
+                barp (x) { calls.push('barp=' + x); },
+                foop (x) { calls.push('foop=' + x); },
+                zipp (x) { calls.push('zipp=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
+        });
+
+        it('should transform all events by function', function () {
+            class MyRelay extends Relayer {
+                constructor (target) {
+                    super();
+                    this.target = target;
+                }
+
+                relay (event, args) {
+                    this.target.fire(event + 'x', ...args);
+                }
+            }
+
+            let token = this.obj.relayEvents(new MyRelay(this.obj2));
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); },
+
+                barx (x) { calls.push('barx=' + x); },
+                foox (x) { calls.push('foox=' + x); },
+                zipx (x) { calls.push('zipx=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foox=42', 'barx=427', 'zipx=123' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foox=42', 'barx=427', 'zipx=123' ]);
         });
     });
 
@@ -1510,7 +1772,7 @@ function defineSuite (T) {
 
                     this.obj2.fire('m-m');
                     expect(calls).to.equal([ 'f1h', 'f1i', 'f2h', 'f2i',
-                        'f1h', 'f1i', 'f2h', 'f2i']);
+                        'f1h', 'f1i', 'f2h', 'f2i' ]);
                 });
 
                 ['obj', 'obj2'].forEach(name => {

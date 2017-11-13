@@ -6,18 +6,7 @@ for doing more involved work.
 
 For example:
 
-    // Listen to "foo", "bar" and "zap" events:
-    
-    let token = watchable.on({
-        foo () { /* ... */ },
-        bar () { /* ... */ },
-        zap () { /* ... */ }
-    });
-    
-    // ...
-    
-    // Now remove all 3 listeners:
-    token.destroy();
+![snippet](./docs/snippet1.png)
 
 This is just one of the API improvements. There are many more described below!
 
@@ -340,7 +329,7 @@ To transform all events in one way, `options` can be a function:
 For maximum flexibility, a custom relayer class can be written and an instance passed as
 the first and only parameter to `relayEvents`:
 
-    const { Relayer, Watchable } = require('@epiphanysoft/watchable');
+    const { Relayer } = require('@epiphanysoft/watchable/relay');
 
     class MyRelayer extends Relayer {
         constructor (target) {
@@ -356,12 +345,14 @@ the first and only parameter to `relayEvents`:
     watchable1.relayEvents(new MyRelayer(watchable2));
 
 In this case, `watchable1` will call the `relay()` method for all events it fires. The
-`relay` method can then decide the particulars.
+`relay` method can then decide the particulars. All of the features described above can
+be leveraged by calling `super.relay()` as long as the `constructor` passes the `options`
+object to its `super()`.
 
 ## Utility Methods
 
-The `watchable` provides several helper functions that are directly exported. These are
-mostly to mimic the `event-emitter` API since many equivalent capabilities are available
+The `watchable` module provides several helper functions that are directly exported. These
+are mostly to mimic the `event-emitter` API since many equivalent capabilities are available
 as described above.
 
 These methods are:
@@ -406,10 +397,11 @@ Removes all listeners on the `watchable` instance.
 
     unify (watchable1, watchable2);
 
-This (non-reversibly) connects the two watchable instances listeners and firing. This is
-done by sharing the listener registrations. This means that listeners registered on one
+This (non-reversibly) connects the listeners of the two watchable instances. This is done
+by sharing the listener registrations. This means that listeners registered on one
 instance will be in fact be registered on both. This has the effect that which ever of
-these instances is used to `fire()` an event, all listeners will be invoked.
+these instances is used to `fire()` an event, all listeners will be invoked, regardless of
+the instance on which they appear to be registered.
 
 To `unify()` multiple watchable instances, it is important to always pass one of the
 current group members as the first argument:

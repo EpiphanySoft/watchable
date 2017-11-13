@@ -60,10 +60,10 @@ class Relayer {
                 }
             }
             else {
-                for (let event in Object.keys(config)) {
+                for (let event of Object.keys(config)) {
                     let val = config[event];
 
-                    if (val === true) {
+                    if (event !== '*' && val === true) {
                         val = event;
                     }
 
@@ -100,7 +100,7 @@ class Relayer {
             ret = this.target.fire(event, ...args);
         }
         else {
-            entry = map[event] || map['*'];
+            entry = (event in map) ? map[event] : map['*'];
 
             if (entry) {
                 if (typeof entry === 'function') {
