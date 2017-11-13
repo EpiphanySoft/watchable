@@ -14,6 +14,7 @@ This is just one of the API improvements. There are many more described below!
 
 You can generally drop in `watchable` as an enhanced `event-emiiter` module:
 
+```javascript
     const watchable = require('@epiphanysoft/watchable');
     
     function MyClass () { /* ... */ }
@@ -23,7 +24,7 @@ You can generally drop in `watchable` as an enhanced `event-emiiter` module:
     let inst = new MyClass();
     
     // ... use inst.on(), inst.off(), inst.once() and inst.emit()
-
+```
 There are some minor differences in how the extra utilities work (such as `pipe`,
 `unify`, `all-off` and `has-listeners`).
 
@@ -43,6 +44,7 @@ Watchable expands on the `event-emitter` API in the following ways:
 The `event-emitter` API is based on ES5 "classes", but `watchable` exports a proper ES6
 class:
 
+```javascript
     const { Watchable } = require('@epiphanysoft/watchable');
     
     class MyClass extends Watchable {
@@ -57,7 +59,7 @@ class:
     inst.fire('foo', 42);       // "emit" is an alias for "fire"
     
     inst.un('foo', handler);    // "off" is an alias for "un"
-
+```
 The use of `un()` instead of `off()` and `fire()` instead of `emit()` is a matter of
 preference since both are supported. 
 
@@ -66,6 +68,7 @@ preference since both are supported.
 When uses classes, listener functions are inconvenient so `watchable` also supports
 listener methods:
 
+```javascript
     class MyClass extends Watchable {
         //...
     }
@@ -84,22 +87,27 @@ listener methods:
     let watcher = new MyWatcher();
     
     watchable.on('foo', onFoo', watcher);
-
+```
 To remove a listener method you must supply the same instance:
 
+```javascript
     watchable.un('foo', onFoo', watcher);
+```
 
 ## Multiple Listeners
 
 The `unAll` method that will remove all listeners:
 
+```javascript
     watchable.unAll();
+```
 
 While useful, most cases require a more controlled approach.
 
 Listening to multiple events from an object is a common need, so `watchable` has made
 this simple:
 
+```javascript
     // listen to "foo" and "bar" events:
     watchable.on({
         foo () {
@@ -110,10 +118,12 @@ this simple:
             //...
         }
     });
+```
 
 The object passed to `on()` is called a "listener manifest". That same object can be
 passed to `un()` to remove all of the listeners, but there is an easier way:
 
+```javascript
     let token = watchable.on({
         foo () {
             //...
@@ -127,18 +137,21 @@ passed to `un()` to remove all of the listeners, but there is an easier way:
     // ...
     
     token.destroy();
+```
 
 By destroying the returned token (which is the only method it supports), all of the
 corresponding listeners will be removed.
 
 The same applies to listener methods:
 
+```javascript
     let token = watchable.on({
         foo: 'onFoo',
         bar: 'onBar',
         
         this: watcher
     });
+```
 
 The special key `this` in the listener manifest is understood to be the target object
 of the listener methods.
@@ -152,6 +165,7 @@ When using listener methods, it can be convenient to have a default or named sco
 
 Consider these two cases:
 
+```javascript
     watchable.on({
         foo: 'onFoo',
         bar: 'onBar'
@@ -163,9 +177,11 @@ Consider these two cases:
         
         this: 'parent'
     });
+```
 
 To enable the above, the instance involved must implement `resolveListenerScope`:
 
+```javascript
     class MyClass extends Watchable {
         //...
 
@@ -173,6 +189,7 @@ To enable the above, the instance involved must implement `resolveListenerScope`
             return (scope === 'parent') ? this.parent : this;
         }
     }
+```
 
 The full parameter list passed to `resolveListenerScope` is as below:
 
@@ -198,16 +215,19 @@ implementor is free to place expando properties on the same object for its own b
 
 Some expensive actions can be avoided using the `hasListeners` method:
 
+```javascript
     if (watchable.hasListeners('change')) {
         //... expensive stuff
 
         watchable.fire('change');
     }
+```
 
 Setting up to fire some events (say file-system observations) can come at a cost. In
 these cases it is helpful to know when listeners are added or removed so that these
 expensive setups can be delayed or avoided as well as cleaned up when no longer needed.
 
+```javascript
     class MyClass extends Watchable {
         //...
 
@@ -219,6 +239,7 @@ expensive setups can be delayed or avoided as well as cleaned up when no longer 
             // ... event had one listener and now has none ...
         }
     }
+```
 
 The `onEventWatch` and `onEventUnwatch` methods are optional and will be called if they
 are implemented.
@@ -227,6 +248,7 @@ are implemented.
 
 When relaying one event between watchable instances, there is always the manual solution:
 
+```javascript
     let watchable1 = new Watchable();
     let watchable2 = new Watchable();
     
@@ -235,11 +257,14 @@ When relaying one event between watchable instances, there is always the manual 
             watchable2.fire('foo', ...args);
         }
     });
+```
 
 To relay all events fired by `watchable1`, however, requires a different approach. The
 solution provided by `watchable` is an event relayer:
 
+```javascript
     const relayEvents = require('@epiphanysoft/watchable/relay');
+```
 
 The above `require` returns a function that can be used to create event relayers but it
 also enables the latent `relayEvents` method which is already defined on all watchable
@@ -247,9 +272,11 @@ objects.
 
 These are equivalent:
 
+```javascript
     relayEvents(watchable1, watchable2);
     
     watchable1.relayEvents(watchable2);
+```
 
 They both create an event relayer and register it with `watchable1`. The second form is
 generally preferred since most of the operations provided by `watchable` are instance
@@ -258,17 +285,21 @@ the `relayEvent` method on all watchable instance will work properly.
 
 Removing a relayer is similar to removing a listener manifest:
 
+```javascript
     let token = watchable1.relayEvents(watchable2);
     
     // ...
     
     token.destroy();
+```
 
 To relay multiple events, but not all events, `relayEvents` accepts an `options` argument:
 
+```javascript
     watchable1.relayEvents(watchable2, [
         'foo', 'bar'
     ]);
+```
 
 When `options` is an array, it is understood as an array of event names to relay. In this
 case, only these events will be relayed.
@@ -276,17 +307,21 @@ case, only these events will be relayed.
 The `options` argument can be an object whose keys are event names. The following is
 equivalent to the array form above:
 
+```javascript
     watchable1.relayEvents(watchable2, {
         foo: true,
         bar: true
     });
+```
 
 To relay all events except `bar`:
 
+```javascript
     watchable1.relayEvents(watchable2, {
         '*': true,
         bar: false
     });
+```
 
 The special `'*'` pseudo event is used to change the default mapping of events not given
 in the `options` object.
@@ -295,13 +330,16 @@ The values in the `options` object can be used to rename or transform individual
 
 To relay `foo` without modification but rename the `bar` event to `barish`:
 
+```javascript
     watchable1.relayEvents(watchable2, {
         foo: true,
         bar: 'barish'
     });
+```
 
 To instead transform the `bar` event:
 
+```javascript
     watchable1.relayEvents(watchable2, {
         foo: true,
         
@@ -309,9 +347,11 @@ To instead transform the `bar` event:
             return watchable2.fire('barish', ...args);
         }
     });
+```
 
 To relay all events and only transform `bar`:
 
+```javascript
     watchable1.relayEvents(watchable2, {
         '*': true,
         
@@ -319,16 +359,20 @@ To relay all events and only transform `bar`:
             return watchable2.fire('barish', ...args);
         }
     });
+```
 
 To transform all events in one way, `options` can be a function:
 
+```javascript
     watchable1.relayEvents(watchable2, (event, args) => {
         return target.fire(event, ...args);
     });
+```
 
 For maximum flexibility, a custom relayer class can be written and an instance passed as
 the first and only parameter to `relayEvents`:
 
+```javascript
     const { Relayer } = require('@epiphanysoft/watchable/relay');
 
     class MyRelayer extends Relayer {
@@ -343,6 +387,7 @@ the first and only parameter to `relayEvents`:
     }
 
     watchable1.relayEvents(new MyRelayer(watchable2));
+```
 
 In this case, `watchable1` will call the `relay()` method for all events it fires. The
 `relay` method can then decide the particulars. All of the features described above can
@@ -357,45 +402,59 @@ as described above.
 
 These methods are:
 
+```javascript
     const { hasListeners, is, unAll } = require('@epiphanysoft/watchable');
     const pipe = require('@epiphanysoft/watchable/pipe');
     const unify = require('@epiphanysoft/watchable/unify');
+```
 
 The `hasListeners` and `unAll` methods are also available as instance methods of watchable
 objects.
 
 ### hasListeners
 
+```javascript
     hasListeners (watchable, event);
+```
 
 Returns `true` if the `watchable` instance has one ore more listeners for `event`.
 
 ### is
 
+```javascript
     is (candidate);
+```
 
 Returns `true` if the `candidate` is a watchable object.
 
 ### pipe
 
+```javascript
     pipe (watchable1, watchable2);
+```
 
 Relays all events fired on `watchable1` to `watchable2`. This is an `event-emitter` name
 for the `relayEvents` method described above:
 
+```javascript
     pipe (watchable1, watchable2) {
         return watchable1.relayEvents(watchable2);
     }
+```
 
 ### unAll
 
+```javascript
     unAll (watchable);
+```
 
 Removes all listeners on the `watchable` instance.
 
 ### unify
 
+```javascript
     unify (watchable1, watchable2);
+```
 
 This (non-reversibly) connects the listeners of the two watchable instances. This is done
 by sharing the listener registrations. This means that listeners registered on one
@@ -406,6 +465,7 @@ the instance on which they appear to be registered.
 To `unify()` multiple watchable instances, it is important to always pass one of the
 current group members as the first argument:
 
+```javascript
     // OK
     unify (watchable1, watchable2);
     unify (watchable1, watchable3);
@@ -413,6 +473,7 @@ current group members as the first argument:
     // BAD
     unify (watchable1, watchable2);
     unify (watchable3, watchable2);
+```
 
 This is because preference is given to the first watchable object when merging.
 
@@ -424,6 +485,7 @@ other modules.
 To facilitate such enhancements, the entire Mocha test suite is exported to allow such
 modules to verify compliance with the full `watchable` interface contract:
 
+```javascript
     const { Watchable } = require('@epiphanysoft/watchable');
 
     class MyWatchable extends Watchable {
@@ -436,3 +498,4 @@ modules to verify compliance with the full `watchable` interface contract:
     describe('MyWatchable', function () {
         watchableTestSuite(MyWatchable);
     });
+```
