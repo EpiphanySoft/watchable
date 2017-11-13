@@ -86,12 +86,12 @@ listener methods:
     let watchable = new MyClass();
     let watcher = new MyWatcher();
     
-    watchable.on('foo', onFoo', watcher);
+    watchable.on('foo', 'onFoo', watcher);
 ```
 To remove a listener method you must supply the same instance:
 
 ```javascript
-    watchable.un('foo', onFoo', watcher);
+    watchable.un('foo', 'onFoo', watcher);
 ```
 
 ## Multiple Listeners
