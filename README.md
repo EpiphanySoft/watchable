@@ -596,3 +596,7 @@ modules to verify compliance with the full `watchable` interface contract:
         watchableTestSuite(MyWatchable);
     });
 ```
+
+# License
+
+[MIT](./LICENSE)
