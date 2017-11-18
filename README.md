@@ -1,4 +1,5 @@
 # watchable
+[![Build Status](https://travis-ci.org/epiphanysoft/watchable.svg?branch=master)](https://travis-ci.org/epiphanysoft/watchable)
 [![Coverage Status](https://coveralls.io/repos/github/EpiphanySoft/watchable/badge.svg?branch=master)](https://coveralls.io/github/EpiphanySoft/watchable?branch=master)
 
 An enhanced event firing module similar to `event-emitter`. While `watchable` can be
