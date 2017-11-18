@@ -374,6 +374,7 @@ The valid arguments to `relayEvents` are:
     watchable.relayEvents(target, String...); // relay events in arguments
     watchable.relayEvents(target, String[]);  // relay all events in array
     watchable.relayEvents(target, Object);    // specify relay "options"
+    watchable.relayEvents(target, Function);  // specify relay function
     watchable.relayEvents(relayer);           // add a relayer instance 
 ```
 
@@ -387,7 +388,7 @@ Removing a relayer is similar to removing a listener manifest:
     token.destroy();
 ```
 
-To relay multiple events, but not all events, `relayEvents` accepts an `options` argument:
+To relay multiple events, but not all events:
 
 ```javascript
     watchable1.relayEvents(watchable2, 'foo', 'bar');
@@ -396,11 +397,8 @@ To relay multiple events, but not all events, `relayEvents` accepts an `options`
     watchable1.relayEvents(watchable2, [ 'foo', 'bar' ]);
 ```
 
-When `options` is an array, it is understood as an array of event names to relay. In this
-case, only these events will be relayed.
-
-The `options` argument can be an object whose keys are event names. The following is
-equivalent to the array form above:
+The `options` object form accepts an object whose keys are event names. The following is
+equivalent to the above:
 
 ```javascript
     watchable1.relayEvents(watchable2, {
@@ -456,13 +454,29 @@ To relay all events and only transform `bar`:
     });
 ```
 
-To transform all events in one way, `options` can be a function:
+To transform all fired events, you can specify a relay function:
 
 ```javascript
-    watchable1.relayEvents(watchable2, (event, args) => {
-        return target.fire(event, ...args);
+    watchable1.relayEvents(null, (event, args) => {
+        return watchable2.fire(event, ...args);
     });
 ```
+
+The `null` argument is required to differentiate this case from a watchable class (which
+is just a constructor function). Further, the relayer function does not have to be an `=>`
+function:
+
+```javascript
+    function relayer (event, args) {
+        return this.target.fire(event, ...args);
+    }
+    
+    watchable1.relayEvents(watchable2, relayer);
+    watchable1.relayEvents(watchable3, relayer);
+```
+
+In this case, `this.target` in the `relayer` function refers to the relayer instance that
+is created to hold the target of the relay.
 
 For maximum flexibility, a custom relayer class can be written and an instance passed as
 the first and only parameter to `relayEvents`:

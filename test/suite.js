@@ -1190,7 +1190,39 @@ function defineSuite (T) {
             expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
         });
 
-        it('should transform all events by function', function () {
+        it('should transform all events by arrow function', function () {
+            let token = this.obj.relayEvents(null, (event, args) => {
+                this.obj2.fire(event + 'p', ...args);
+            });
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); },
+
+                barp (x) { calls.push('barp=' + x); },
+                foop (x) { calls.push('foop=' + x); },
+                zipp (x) { calls.push('zipp=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foop=42', 'barp=427', 'zipp=123' ]);
+        });
+
+        it('should transform all events by Relayer derived class', function () {
             class MyRelay extends Relayer {
                 constructor (target) {
                     super();

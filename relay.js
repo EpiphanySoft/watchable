@@ -10,28 +10,26 @@ class Relayer {
     static create (source, target, options) {
         let relay = target;
 
-        if (target) {
-            if (!target.isEventRelayer) {
-                relay = new Relayer(options);
-                relay.target = target;
-            }
+        if (!target || !target.isEventRelayer) {
+            relay = new Relayer(options);
+            relay.target = target;
+        }
 
-            relay.source = source;
+        relay.source = source;
 
-            let relayers = source[relayersSym];
+        let relayers = source[relayersSym];
 
-            if (!relayers) {
-                source[relayersSym] = relayers = [ relay ];
+        if (!relayers) {
+            source[relayersSym] = relayers = [ relay ];
+            relayers[firingSym] = 0;
+        }
+        else if (!relayers.includes(relay)) {
+            if (relayers[firingSym]) {
+                source[relayersSym] = relayers = relayers.slice();
                 relayers[firingSym] = 0;
             }
-            else if (!relayers.includes(relay)) {
-                if (relayers[firingSym]) {
-                    source[relayersSym] = relayers = relayers.slice();
-                    relayers[firingSym] = 0;
-                }
 
-                relayers.push(relay);
-            }
+            relayers.push(relay);
         }
 
         return relay;
