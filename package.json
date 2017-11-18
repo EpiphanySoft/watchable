@@ -11,7 +11,9 @@
   },
   "devDependencies": {
     "assertly": "^1.0.2",
-    "mocha": "^3.5.3"
+    "coveralls": "^3.0.0",
+    "mocha": "^3.5.3",
+    "nyc": "^11.3.0"
   },
   "directories": {
     "bin": "./bin",
@@ -28,10 +30,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EpiphanySoft/watchable.git"
+    "url": "https://github.com/EpiphanySoft/watchable.git"
   },
   "scripts": {
     "debug": "devtool node_modules/mocha/bin/_mocha -qc -- ./test/specs/**/*.js",
-    "test": "mocha ./test/specs/**/*.js"
+    "test": "nyc mocha ./test/specs/**/*.js",
+    "coverage": "nyc report --reporter=text-lcov | coveralls",
+    "cover": "nyc mocha ./test/specs/**/*.js"
   }
 }
