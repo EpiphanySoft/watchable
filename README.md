@@ -1,4 +1,5 @@
 # watchable
+[![Coverage Status](https://coveralls.io/repos/github/EpiphanySoft/watchable/badge.svg?branch=master)](https://coveralls.io/github/EpiphanySoft/watchable?branch=master)
 
 An enhanced event firing module similar to `event-emitter`. While `watchable` can be
 (almost) a drop-in replacement for `event-emitter`, its goal is to provide a better API
