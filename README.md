@@ -1,6 +1,9 @@
 # watchable
 [![Build Status](https://travis-ci.org/epiphanysoft/watchable.svg?branch=master)](https://travis-ci.org/epiphanysoft/watchable)
 [![Coverage Status](https://coveralls.io/repos/github/EpiphanySoft/watchable/badge.svg?branch=master)](https://coveralls.io/github/EpiphanySoft/watchable?branch=master)
+[![Dependencies Status](https://david-dm.org/epiphanysoft/watchable/status.svg)](https://david-dm.org/epiphanysoft/watchable)
+[![npm version](https://badge.fury.io/js/%40epiphanysoft%2Fwatchable.svg)](https://badge.fury.io/js/%40epiphanysoft%2Fwatchable)
+[![MIT Licence](https://badges.frapsoft.com/os/mit/mit.svg?v=103)](https://opensource.org/licenses/mit-license.php)
 
 An enhanced event firing module similar to `event-emitter`. While `watchable` can be
 (almost) a drop-in replacement for `event-emitter`, its goal is to provide a better API
