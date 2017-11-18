@@ -926,6 +926,58 @@ function defineSuite (T) {
             expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
         });
 
+        it('should relay one event by name', function () {
+            let token = this.obj.relayEvents(this.obj2, 'foo');
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42' ]);
+        });
+
+        it('should relay two events by name', function () {
+            let token = this.obj.relayEvents(this.obj2, 'foo', 'bar');
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); },
+                zip (x) { calls.push('zip=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+        });
+
         it('should relay events by name in array', function () {
             let token = this.obj.relayEvents(this.obj2, [
                 'foo',

@@ -278,7 +278,16 @@ class Watchable {
         return update(this, un, name, fn, scope);
     }
 
-    relayEvents (target, options) {
+    relayEvents (target, ...args) {
+        let n = args.length;
+        let options = n && args[0] || null;
+
+        // relayEvents(target, 'foo', 'bar')
+        // relayEvents(target, 'foo')
+        if (n > 1 || typeof options === 'string') {
+            options = args;
+        }
+
         return Watchable.Relayer.create(this, target, options);
     }
 

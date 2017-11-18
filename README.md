@@ -20,9 +20,17 @@ For example:
     token.destroy();
 ```
 
-This is just one of the API improvements. There are many more described below!
+These are just a couple of the API improvements. There are many more... read on!
 
-## Substitution
+## Installing
+
+You can install `watchable` from the Nuclear Pizza Machine:
+
+    npm install @epiphanysoft/watchable --save
+
+Or clone from GitHub.
+
+# Usage
 
 You can generally drop in `watchable` as an enhanced `event-emiiter` module:
 
@@ -40,23 +48,23 @@ You can generally drop in `watchable` as an enhanced `event-emiiter` module:
 There are some minor differences in how the extra utilities work (such as `pipe`,
 `unify`, `all-off` and `has-listeners`).
 
-# Expanded API
-
-Watchable expands on the `event-emitter` API in the following ways:
-
- - Watchable ES6 base class.
- - Listener methods (not just functions).
- - Add/Remove multiple event listeners in one call.
- - Dynamic scope resolution.
- - Notification of transition to/from 0 listeners to events.
- - Flexible event relaying.
-
-## Preferred API
-
 The `event-emitter` API is based on ES5 "classes", but `watchable` exports a proper ES6
 class. Also, as with `event-emitter`, you can just create instances and use them directly. 
 
-### Watchable Base Class
+## API Summary
+
+A summary of the `Watchable` API:
+
+ - ES6 base class
+ - Configurable instances
+ - Listener methods (not just functions)
+ - Add/Remove multiple event listeners in one call
+ - Dynamic scope resolution
+ - Notification when adding first listener to an event
+ - Notification when removing last listener to an event
+ - Flexible event relaying
+
+## Watchable Base Class
 
 The `Watchable` class is a proper ES6 class from which you can derive:
 
@@ -82,7 +90,7 @@ The `Watchable` class is a proper ES6 class from which you can derive:
 The use of `un()` instead of `off()` and `fire()` instead of `emit()` is a matter of
 preference since both are supported. 
 
-### Configurable Instance
+## Configurable Instance
 
 The `Watchable` class can also be created and configured directly:
 
@@ -130,7 +138,11 @@ listener methods:
     
     let watchable = new MyClass();
     let watcher = new MyWatcher();
-    
+
+    // NO:
+    watchable.on('foo', watcher.onFoo.bind(watcher));
+
+    // YES:
     watchable.on('foo', 'onFoo', watcher);
 ```
 To remove a listener method you must supply the same instance:
@@ -166,7 +178,7 @@ this simple:
 ```
 
 The object passed to `on()` is called a "listener manifest". That same object can be
-passed to `un()` to remove all of the listeners, but there is an easier way:
+passed to `un()` to remove all of the listeners just added, but there is an easier way:
 
 ```javascript
     let token = watchable.on({
@@ -184,8 +196,7 @@ passed to `un()` to remove all of the listeners, but there is an easier way:
     token.destroy();
 ```
 
-By destroying the returned token (which is the only method it supports), all of the
-corresponding listeners will be removed.
+By destroying the returned token, all of the corresponding listeners will be removed.
 
 The same applies to listener methods:
 
@@ -196,13 +207,17 @@ The same applies to listener methods:
         
         this: watcher
     });
+
+    //...
+
+    token.destroy();
 ```
 
 The special key `this` in the listener manifest is understood to be the target object
 of the listener methods.
 
 A listener manifest can contain a mixture of method names and functions, but it is
-generally best to use a consistent form at least on a per-call basis.
+generally best to use a consistent form ()at least on a per-call basis).
 
 ## Scope Resolution
 
@@ -224,7 +239,7 @@ Consider these two cases:
     });
 ```
 
-To enable the above, the instance involved must implement `resolveListenerScope`:
+To enable the above, the watchable instance must implement `resolveListenerScope`:
 
 ```javascript
     class MyClass extends Watchable {
@@ -237,17 +252,15 @@ To enable the above, the instance involved must implement `resolveListenerScope`
     
     // Or using an instance:
     
-    let parent; // defined somewhere
-    
     let watchable = new Watchable({
         resolveScope (scope) {
-            return (scope === 'parent') ? parent : this;
+            //...
         }
     });
 ```
 
 When using an instance in the second part above, the `resolveScope` property of the config
-object is used to set the `resolveListenerScope` method on the instance.
+object is used to set the `resolveListenerScope` method on the watchable instance.
 
 The full parameter list passed to `resolveListenerScope` is as below:
 
@@ -356,6 +369,16 @@ generally preferred since most of the operations provided by `watchable` are ins
 methods. Basically, as long as some module issues a `require('.../watchable/relay)` then
 the `relayEvent` method on all watchable instance will work properly.
 
+The valid arguments to `relayEvents` are:
+
+```javascript
+    watchable.relayEvents(target);            // relay all events 
+    watchable.relayEvents(target, String...); // relay events in arguments
+    watchable.relayEvents(target, String[]);  // relay all events in array
+    watchable.relayEvents(target, Object);    // specify relay "options"
+    watchable.relayEvents(relayer);           // add a relayer instance 
+```
+
 Removing a relayer is similar to removing a listener manifest:
 
 ```javascript
@@ -369,9 +392,10 @@ Removing a relayer is similar to removing a listener manifest:
 To relay multiple events, but not all events, `relayEvents` accepts an `options` argument:
 
 ```javascript
-    watchable1.relayEvents(watchable2, [
-        'foo', 'bar'
-    ]);
+    watchable1.relayEvents(watchable2, 'foo', 'bar');
+
+    // Or
+    watchable1.relayEvents(watchable2, [ 'foo', 'bar' ]);
 ```
 
 When `options` is an array, it is understood as an array of event names to relay. In this
