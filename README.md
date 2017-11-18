@@ -209,9 +209,9 @@ The special key `this` in the listener manifest is understood to be the target o
 of the listener methods.
 
 A listener manifest can contain a mixture of method names and functions, but it is
-generally best to use a consistent form ()at least on a per-call basis).
+generally best to use a consistent form (at least on a per-call basis).
 
-There is also the `unAll` method will remove all listeners from a watchable instance:
+There is also the `unAll` method which removes all listeners from a watchable instance:
 
 ```javascript
     watchable.unAll();
