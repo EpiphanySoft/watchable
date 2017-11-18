@@ -208,6 +208,16 @@ function update (instance, updater, name, fn, scope) {
 //----------------------------------------
 
 class Watchable {
+    constructor (config) {
+        if (config) {
+            for (let c of morph.allowedConfigs) {
+                if (c in config) {
+                    this[morph.allowedConfigsMap[c]] = config[c];
+                }
+            }
+        }
+    }
+
     emit (event, ...args) {
         return this.fire(event, ...args);
     }
@@ -321,5 +331,13 @@ morph.is = (instance) => {
 morph.unAll = (instance, event) => {
     proto.unAll.call(instance, event);
 };
+
+morph.allowedConfigsMap = {
+    onWatch: 'onEventWatch',
+    onUnwatch: 'onEventUnwatch',
+    resolveScope: 'resolveListenerScope'
+};
+
+morph.allowedConfigs = Object.keys(morph.allowedConfigsMap);
 
 module.exports = morph;

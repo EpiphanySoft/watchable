@@ -1,12 +1,24 @@
 # watchable
 
-An enhanced event firing solution similar to `event-emitter`. While `watchable` can be
+An enhanced event firing module similar to `event-emitter`. While `watchable` can be
 (almost) a drop-in replacement for `event-emitter`, its goal is to provide a better API
-for doing more involved work.
+for common tasks and doing more involved work.
 
 For example:
 
-![snippet](./docs/snippet1.png)
+```javascript
+    // Listen to 'foo', 'bar' and 'zap' events:
+    let token = watchable.on({
+        foo () { /* ... */ },
+        bar () { /* ... */ },
+        zap () { /* ... */ }
+    });
+    
+    // ...
+    
+    // Now remove all 3 listeners:
+    token.destroy();
+```
 
 This is just one of the API improvements. There are many more described below!
 
@@ -39,16 +51,23 @@ Watchable expands on the `event-emitter` API in the following ways:
  - Notification of transition to/from 0 listeners to events.
  - Flexible event relaying.
 
-## Preferred API - Watchable Base Class
+## Preferred API
 
 The `event-emitter` API is based on ES5 "classes", but `watchable` exports a proper ES6
-class:
+class. Also, as with `event-emitter`, you can just create instances and use them directly. 
+
+### Watchable Base Class
+
+The `Watchable` class is a proper ES6 class from which you can derive:
 
 ```javascript
     const { Watchable } = require('@epiphanysoft/watchable');
     
     class MyClass extends Watchable {
-        //...
+        constructor () {
+            super();
+            //...
+        }
     }
     
     let inst = new MyClass();
@@ -63,14 +82,40 @@ class:
 The use of `un()` instead of `off()` and `fire()` instead of `emit()` is a matter of
 preference since both are supported. 
 
+### Configurable Instance
+
+The `Watchable` class can also be created and configured directly:
+
+```javascript
+    const { Watchable } = require('@epiphanysoft/watchable');
+    
+    let inst = new Watchable({
+        // configs go here (see below)
+    });
+
+    let handler = x => console.log(x);
+    
+    inst.on('foo', handler);
+    
+    inst.fire('foo', 42);       // "emit" is an alias for "fire"
+    
+    inst.un('foo', handler);    // "off" is an alias for "un"
+```
+
+The config object passed to the `constructor` will be explained as the individual properties
+are explored below.
+
 ## Listener Methods
 
-When uses classes, listener functions are inconvenient so `watchable` also supports
+When using classes, listener functions are inconvenient so `watchable` also supports
 listener methods:
 
 ```javascript
     class MyClass extends Watchable {
-        //...
+        method () {
+            //...
+            this.fire('foo');
+        }
     }
     
     class MyWatcher {
@@ -96,7 +141,7 @@ To remove a listener method you must supply the same instance:
 
 ## Multiple Listeners
 
-The `unAll` method that will remove all listeners:
+The `unAll` method will remove all listeners from a watchable instance:
 
 ```javascript
     watchable.unAll();
@@ -189,7 +234,20 @@ To enable the above, the instance involved must implement `resolveListenerScope`
             return (scope === 'parent') ? this.parent : this;
         }
     }
+    
+    // Or using an instance:
+    
+    let parent; // defined somewhere
+    
+    let watchable = new Watchable({
+        resolveScope (scope) {
+            return (scope === 'parent') ? parent : this;
+        }
+    });
 ```
+
+When using an instance in the second part above, the `resolveScope` property of the config
+object is used to set the `resolveListenerScope` method on the instance.
 
 The full parameter list passed to `resolveListenerScope` is as below:
 
@@ -228,6 +286,7 @@ these cases it is helpful to know when listeners are added or removed so that th
 expensive setups can be delayed or avoided as well as cleaned up when no longer needed.
 
 ```javascript
+    // When using the base class:
     class MyClass extends Watchable {
         //...
 
@@ -239,10 +298,24 @@ expensive setups can be delayed or avoided as well as cleaned up when no longer 
             // ... event had one listener and now has none ...
         }
     }
+
+    // When creating an instance:
+    let watchable = new Watchable({
+        onWatch (event) {
+            // ... event had no listeners and now has one ...
+        },
+        
+        onUnwatch (event) {
+            // ... event had one listener and now has none ...
+        }
+    });
 ```
 
 The `onEventWatch` and `onEventUnwatch` methods are optional and will be called if they
 are implemented.
+
+When configuring a `Watchable` instance, the `onWatch` and `onUnwatch` properties of the
+config object set the `onEventWatch` and `onEventUnwatch` methods, respectively.
 
 ## Relaying Events
 
