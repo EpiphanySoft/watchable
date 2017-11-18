@@ -153,14 +153,6 @@ To remove a listener method you must supply the same instance:
 
 ## Multiple Listeners
 
-The `unAll` method will remove all listeners from a watchable instance:
-
-```javascript
-    watchable.unAll();
-```
-
-While useful, most cases require a more controlled approach.
-
 Listening to multiple events from an object is a common need, so `watchable` has made
 this simple:
 
@@ -218,6 +210,12 @@ of the listener methods.
 
 A listener manifest can contain a mixture of method names and functions, but it is
 generally best to use a consistent form ()at least on a per-call basis).
+
+There is also the `unAll` method will remove all listeners from a watchable instance:
+
+```javascript
+    watchable.unAll();
+```
 
 ## Scope Resolution
 
