@@ -475,8 +475,8 @@ function:
     watchable1.relayEvents(watchable3, relayer);
 ```
 
-In this case, `this.target` in the `relayer` function refers to the relayer instance that
-is created to hold the target of the relay.
+In this case, `this` in the `relayer` function refers to the relayer instance that is
+created to hold the `target` of the relay.
 
 For maximum flexibility, a custom relayer class can be written and an instance passed as
 the first and only parameter to `relayEvents`:
