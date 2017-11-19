@@ -27,6 +27,10 @@ module.exports = {
         return descriptors;
     },
 
+    indexOf (array, item) {
+        return array ? array.indexOf(item) : -1;
+    },
+
     symbols: {
         actual:   Symbol('actualListener'),
         firing:   Symbol('eventFiring'),

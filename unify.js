@@ -41,7 +41,13 @@ function unify (inst1, inst2) {
     else {
         inst1[watchersSym] = map2 || (inst2[watchersSym] = new Empty());
 
-        //TODO if (inst1.onEventWatch)
+        if (map2 && inst1.onEventWatch) {
+            for (let event in map2) {
+                if (map2[event]) {
+                    inst1.onEventWatch(event);
+                }
+            }
+        }
     }
 }
 

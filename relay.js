@@ -1,7 +1,7 @@
 'use strict';
 
 const { Watchable } = require('./Watchable.js');
-const { Empty, symbols } = require('./common.js');
+const { Empty, indexOf, symbols } = require('./common.js');
 
 const firingSym = symbols.firing;
 const relayersSym = symbols.relayers;
@@ -78,7 +78,7 @@ class Relayer {
     destroy () {
         let source = this.source;
         let relayers = source[relayersSym];
-        let index = relayers ? relayers.indexOf(this) : -1;
+        let index = indexOf(relayers, this);
 
         if (index > -1) {
             if (relayers[firingSym]) {

@@ -2,10 +2,11 @@
 
 const expect = require('assertly').expect;
 
-const { hasListeners, is, STOP, symbols, unAll } = require('../Watchable.js');
+const { hasListeners, is, STOP, symbols, unAll, Watchable } = require('../Watchable.js');
 const unify = require('../unify.js');
 
-const { Relayer } = require('../relay.js');  // enable relayEvents() method
+const relayEvents = require('../relay.js');  // enable relayEvents() method
+const { Relayer } = relayEvents;
 
 function defineSuite (T) {
     let K = 0;
@@ -637,6 +638,13 @@ function defineSuite (T) {
 
             this.obj.fire('bar', 789);
             expect(calls).to.equal([ 'a=123', 'c=123', 'b=321', 'b=789' ]);
+
+            if (FN) {
+                unAll(this.obj, 'foo');
+            }
+            else {
+                this.obj.unAll('foo');
+            }
         });
 
         it('should remove only listener to one event', function () {
@@ -671,6 +679,13 @@ function defineSuite (T) {
 
             this.obj.fire('bar', 789);
             expect(calls).to.equal([ 'a=123', 'c=123', 'b=321', 'a=456', 'c=456' ]);
+
+            if (FN) {
+                unAll(this.obj, 'bar');
+            }
+            else {
+                this.obj.unAll('bar');
+            }
         });
     })});
 
@@ -1215,6 +1230,39 @@ function defineSuite (T) {
             expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
         });
 
+        it('should relay all events to two relayers', function () {
+            let calls = [];
+
+            let token = this.obj.relayEvents(this.obj2);
+
+            let obj3 = new T();
+            this.obj.relayEvents(obj3);
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); }
+            });
+
+            obj3.on({
+                foo (x) { calls.push('f3=' + x); },
+                zip (x) { calls.push('z3=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'f3=42', 'bar=427', 'z3=123' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 2);
+            this.obj.fire('bar', 3);
+            this.obj.fire('zip', 4);
+
+            expect(calls).to.equal([ 'foo=42', 'f3=42', 'bar=427', 'z3=123', 'f3=2', 'z3=4' ]);
+        });
+
         it('should relay one event by name', function () {
             let token = this.obj.relayEvents(this.obj2, 'foo');
 
@@ -1523,7 +1571,10 @@ function defineSuite (T) {
                 }
             }
 
-            let token = this.obj.relayEvents(new MyRelay(this.obj2));
+            let relayer = new MyRelay(this.obj2);
+            let token = this.obj.relayEvents(relayer);
+
+            this.obj.relayEvents(relayer);  // should be ignored
 
             let calls = [];
 
@@ -1543,13 +1594,44 @@ function defineSuite (T) {
 
             expect(calls).to.equal([ 'foox=42', 'barx=427', 'zipx=123' ]);
 
-            token.destroy();
+            token.close();
 
             this.obj.fire('foo', 42);
             this.obj.fire('bar', 427);
             this.obj.fire('zip', 123);
 
             expect(calls).to.equal([ 'foox=42', 'barx=427', 'zipx=123' ]);
+        });
+
+        it('should allow multiple calls to destroy', function () {
+            let token = this.obj.relayEvents(this.obj2);
+
+            let calls = [];
+
+            this.obj2.on({
+                bar (x) { calls.push('bar=' + x); },
+                foo (x) { calls.push('foo=' + x); }
+            });
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+            this.obj.fire('zip', 123);
+
+            expect(calls).to.equal([ 'foo=42', 'bar=427' ]);
+
+            // technically this level of hostility should not happen but somebody may
+            // get zealous and null out all things...
+            this.obj[symbols.relayers] = null;
+
+            token.destroy();
         });
     });
 
@@ -1808,6 +1890,46 @@ function defineSuite (T) {
                 this.obj.fire('foo', 321);
 
                 expect(called).to.equal([ 'a=42', 'b=42', 'a=321' ]);
+            });
+        });
+
+        describe('relayEvents', function () {
+            it('should only relay to those registered at time of fire', function () {
+                let calls = [];
+                let obj = this.obj;
+                let obj2 = new T();
+                let obj3, token;
+
+                obj2.on({
+                    foo (x) {
+                        calls.push('a=' + x);
+                        if (!obj3) {
+                            obj3 = new T();
+
+                            obj3.on({
+                                foo (x) {
+                                    calls.push('b=' + x);
+                                }
+                            });
+
+                            token = relayEvents(obj, obj3);
+                        }
+                        else {
+                            token.close();
+                        }
+                    }
+                });
+
+                obj.relayEvents(obj2);
+
+                obj.fire('foo', 123);
+                expect(calls).to.equal([ 'a=123' ]);
+
+                obj.fire('foo', 456);
+                expect(calls).to.equal([ 'a=123', 'a=456', 'b=456' ]);
+
+                obj.fire('foo', 789);
+                expect(calls).to.equal([ 'a=123', 'a=456', 'b=456', 'a=789' ]);
             });
         });
     });  // while firing
@@ -2204,10 +2326,16 @@ function defineSuite (T) {
 
     describe('unify listener manifest', function () {
         let calls;
+        let watch;
 
         beforeEach(function () {
             this.obj2 = new T();
             calls = [];
+
+            if (T === Watchable) {
+                watch = [];
+                this.obj.onEventWatch = event => watch.push(`watch(${event})`);
+            }
 
             this.token = this.obj2.on({
                 foo () { calls.push('foo') },
@@ -2215,6 +2343,77 @@ function defineSuite (T) {
             });
 
             unify(this.obj, this.obj2);
+
+            if (watch) {
+                expect(watch).to.equal([ 'watch(foo)', 'watch(bar)' ]);
+            }
+        });
+
+        it('should merge with one empty watchable', function () {
+            let obj = new T();
+            let obj3 = new T();
+            let calls3 = [];
+
+            obj3.on({
+                foo () { calls3.push('foo') },
+                bar () { calls3.push('bar') }
+            });
+
+            // produce a null in the event map:
+            let fn = () => {};
+            obj3.on('zip', fn);
+            obj3.un('zip', fn);
+
+            unify(obj, obj3);
+
+            expect(obj.hasListeners('foo')).to.be(true);
+            expect(obj.hasListeners('bar')).to.be(true);
+
+            expect(obj3.hasListeners('foo')).to.be(true);
+            expect(obj3.hasListeners('bar')).to.be(true);
+
+            obj.fire('foo');
+            expect(calls3).to.equal([ 'foo' ]);
+
+            obj3.fire('foo');
+            expect(calls3).to.equal([ 'foo', 'foo' ]);
+
+            obj.fire('bar');
+            expect(calls3).to.equal([ 'foo', 'foo', 'bar' ]);
+
+            obj3.fire('bar');
+            expect(calls3).to.equal([ 'foo', 'foo', 'bar', 'bar' ]);
+        });
+
+        it('should merge with two empty watchables', function () {
+            let obj = new T();
+            let obj3 = new T();
+            let calls3 = [];
+
+            unify(obj, obj3);
+
+            obj3.on({
+                foo () { calls3.push('foo') },
+                bar () { calls3.push('bar') }
+            });
+
+            expect(obj.hasListeners('foo')).to.be(true);
+            expect(obj.hasListeners('bar')).to.be(true);
+
+            expect(obj3.hasListeners('foo')).to.be(true);
+            expect(obj3.hasListeners('bar')).to.be(true);
+
+            obj.fire('foo');
+            expect(calls3).to.equal([ 'foo' ]);
+
+            obj3.fire('foo');
+            expect(calls3).to.equal([ 'foo', 'foo' ]);
+
+            obj.fire('bar');
+            expect(calls3).to.equal([ 'foo', 'foo', 'bar' ]);
+
+            obj3.fire('bar');
+            expect(calls3).to.equal([ 'foo', 'foo', 'bar', 'bar' ]);
         });
 
         it('should merge', function () {
@@ -2264,6 +2463,60 @@ function defineSuite (T) {
             this.obj2.fire('bar');
             expect(calls).to.equal([ ]);
         });
+
+        if (T === Watchable) {
+            it('should notify of new listeners', function () {
+                let obj = new T();
+                let obj2 = new T();
+
+                watch = [];
+
+                obj.on({
+                    foo () {}
+                });
+
+                obj.onEventWatch = event => watch.push(`watch(${event})`);
+
+                obj2.on({
+                    foo () { calls.push('foo') },
+                    bar () { calls.push('bar') }
+                });
+
+                // produce a null in the event map:
+                let fn = () => {};
+                obj2.on('zip', fn);
+                obj2.un('zip', fn);
+
+                unify(obj, obj2);
+                unify(obj, obj2);
+
+                expect(watch).to.equal([ 'watch(bar)' ]);
+            });
+
+            it('should notify of new listeners with no other listeners', function () {
+                let obj = new T();
+                let obj2 = new T();
+
+                watch = [];
+
+                obj.onEventWatch = event => watch.push(`watch(${event})`);
+
+                obj2.on({
+                    foo () { calls.push('foo') },
+                    bar () { calls.push('bar') }
+                });
+
+                // produce a null in the event map:
+                let fn = () => {};
+                obj2.on('zip', fn);
+                obj2.un('zip', fn);
+
+                unify(obj, obj2);
+                unify(obj, obj2);
+
+                expect(watch).to.equal([ 'watch(foo)', 'watch(bar)' ]);
+            });
+        }
     });
 }
 
