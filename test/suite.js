@@ -562,9 +562,11 @@ function defineSuite (T) {
     [false, true].forEach(FN => { describe(`unAll ${FN ? 'function' : 'instance method'}`, function () {
         it('should work with no listeners', function () {
             if (FN) {
+                unAll(this.obj, 'foo');
                 unAll(this.obj);
             }
             else {
+                this.obj.unAll('foo');
                 this.obj.unAll();
             }
         });
@@ -601,6 +603,74 @@ function defineSuite (T) {
 
             this.obj.fire('bar', 321);
             expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+        });
+
+        it('should remove all listeners to one event', function () {
+            let calls = [];
+
+            this.obj.on({
+                foo (x) {
+                    calls.push('a=' + x);
+                },
+                bar (x) {
+                    calls.push('b=' + x);
+                }
+            });
+
+            this.obj.on('foo', x => calls.push('c=' + x));
+
+            this.obj.fire('foo', 123);
+            expect(calls).to.equal([ 'a=123', 'c=123' ]);
+
+            this.obj.fire('bar', 321);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+
+            if (FN) {
+                unAll(this.obj, 'foo');
+            }
+            else {
+                this.obj.unAll('foo');
+            }
+
+            this.obj.fire('foo', 456);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+
+            this.obj.fire('bar', 789);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321', 'b=789' ]);
+        });
+
+        it('should remove only listener to one event', function () {
+            let calls = [];
+
+            this.obj.on({
+                foo (x) {
+                    calls.push('a=' + x);
+                },
+                bar (x) {
+                    calls.push('b=' + x);
+                }
+            });
+
+            this.obj.on('foo', x => calls.push('c=' + x));
+
+            this.obj.fire('foo', 123);
+            expect(calls).to.equal([ 'a=123', 'c=123' ]);
+
+            this.obj.fire('bar', 321);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+
+            if (FN) {
+                unAll(this.obj, 'bar');
+            }
+            else {
+                this.obj.unAll('bar');
+            }
+
+            this.obj.fire('foo', 456);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321', 'a=456', 'c=456' ]);
+
+            this.obj.fire('bar', 789);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321', 'a=456', 'c=456' ]);
         });
     })});
 
