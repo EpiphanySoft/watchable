@@ -2,7 +2,7 @@
 
 const expect = require('assertly').expect;
 
-const { is, STOP, symbols } = require('../Watchable.js');
+const { hasListeners, is, STOP, symbols, unAll } = require('../Watchable.js');
 const unify = require('../unify.js');
 
 const { Relayer } = require('../relay.js');  // enable relayEvents() method
@@ -24,6 +24,33 @@ function defineSuite (T) {
             this.obj.fire('foo', 42);
         });
 
+        it('should emit events', function () {
+            let calls = [];
+
+            this.obj.on('bar', x => { calls.push(x); });
+
+            this.obj.emit('bar', 427);
+
+            expect(calls).to.equal([ 427 ]);
+        });
+
+        it('should ignore remove of non-listeners', function () {
+            this.obj.un('foo', () => {});
+            this.obj.fire('foo', 42);
+        });
+
+        it('should ignore remove of non-listeners while other listeners exist', function () {
+            let calls = [];
+
+            this.obj.on('bar', x => { calls.push(x); });
+            this.obj.un('foo', () => {});
+
+            this.obj.fire('foo', 42);
+            this.obj.fire('bar', 427);
+
+            expect(calls).to.equal([ 427 ]);
+        });
+
         it('should fire event to one listener', function () {
             let scope = { woot: 'yey' };
             let arg, that;
@@ -39,7 +66,54 @@ function defineSuite (T) {
             expect(that).to.be(scope);
         });
 
-        it('should fire event with multiple arguments', function () {
+        it('should ignore duplicate single listener', function () {
+            let calls = [];
+            let fn = function (a) {
+                calls.push(a);
+            };
+
+            this.obj.on('foo', fn);
+            this.obj.on('foo', fn);
+
+            this.obj.fire('foo', 42);
+
+            expect(calls).to.equal([ 42 ]);
+        });
+
+        it('should ignore duplicate multi listener', function () {
+            let calls = [];
+            let fn = function (a) {
+                calls.push(a);
+            };
+
+            this.obj.on('foo', a => calls.push('x=' + a));
+            this.obj.on('foo', fn);
+            this.obj.on('foo', fn);
+
+            this.obj.fire('foo', 42);
+
+            expect(calls).to.equal([ 'x=42', 42 ]);
+        });
+
+        it('should ignore duplicate single listener w/scope', function () {
+            let scope = { woot: 'yey' };
+            let arg, that;
+            let fn = function (a) {
+                arg = a;
+                that = this;
+            };
+
+            this.obj.on('foo', fn, scope);
+
+            this.obj.fire('foo', 42);
+
+            expect(arg).to.be(42);
+            expect(that).to.be(scope);
+        });
+    });
+
+    ['fire', 'emit'].forEach(FIRE => { describe(`${FIRE} method`, function () {
+        it(`should ${FIRE} event with multiple arguments`, function () {
             let args = [];
 
             this.obj.on('foo', function (...a) {
@@ -47,31 +121,31 @@ function defineSuite (T) {
                 args.push(...a);
             });
 
-            this.obj.fire('foo');
+            this.obj[FIRE]('foo');
             expect(args).to.equal([ 0 ]);
 
             args = [];
-            this.obj.fire('foo', 42);
+            this.obj[FIRE]('foo', 42);
             expect(args).to.equal([ 1, 42 ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc');
+            this.obj[FIRE]('foo', 42, 'abc');
             expect(args).to.equal([ 2, 42, 'abc' ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123);
+            this.obj[FIRE]('foo', 42, 'abc', 123);
             expect(args).to.equal([ 3, 42, 'abc', 123 ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123, 'xyz');
+            this.obj[FIRE]('foo', 42, 'abc', 123, 'xyz');
             expect(args).to.equal([ 4, 42, 'abc', 123, 'xyz' ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123, 'xyz', -12);
+            this.obj[FIRE]('foo', 42, 'abc', 123, 'xyz', -12);
             expect(args).to.equal([ 5, 42, 'abc', 123, 'xyz', -12 ]);
         });
 
-        it('should fire event with multiple arguments w/scope', function () {
+        it(`should ${FIRE} event with multiple arguments w/scope`, function () {
             let args = [];
             let scope = { a: 'woot' };
 
@@ -81,31 +155,31 @@ function defineSuite (T) {
                 args.push(...a);
             }, scope);
 
-            this.obj.fire('foo');
+            this.obj[FIRE]('foo');
             expect(args).to.equal([ 'woot', 0 ]);
 
             args = [];
-            this.obj.fire('foo', 42);
+            this.obj[FIRE]('foo', 42);
             expect(args).to.equal([ 'woot', 1, 42 ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc');
+            this.obj[FIRE]('foo', 42, 'abc');
             expect(args).to.equal([ 'woot', 2, 42, 'abc' ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123);
+            this.obj[FIRE]('foo', 42, 'abc', 123);
             expect(args).to.equal([ 'woot', 3, 42, 'abc', 123 ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123, 'xyz');
+            this.obj[FIRE]('foo', 42, 'abc', 123, 'xyz');
             expect(args).to.equal([ 'woot', 4, 42, 'abc', 123, 'xyz' ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123, 'xyz', -12);
+            this.obj[FIRE]('foo', 42, 'abc', 123, 'xyz', -12);
             expect(args).to.equal([ 'woot', 5, 42, 'abc', 123, 'xyz', -12 ]);
         });
 
-        it('should fire event with multiple arguments w/named method', function () {
+        it(`should ${FIRE} event with multiple arguments w/named method`, function () {
             let args = [];
             let scope = {
                 a: 'boot',
@@ -118,31 +192,31 @@ function defineSuite (T) {
 
             this.obj.on('foo', 'onFoo', scope);
 
-            this.obj.fire('foo');
+            this.obj[FIRE]('foo');
             expect(args).to.equal([ 'boot', 0 ]);
 
             args = [];
-            this.obj.fire('foo', 42);
+            this.obj[FIRE]('foo', 42);
             expect(args).to.equal([ 'boot', 1, 42 ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc');
+            this.obj[FIRE]('foo', 42, 'abc');
             expect(args).to.equal([ 'boot', 2, 42, 'abc' ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123);
+            this.obj[FIRE]('foo', 42, 'abc', 123);
             expect(args).to.equal([ 'boot', 3, 42, 'abc', 123 ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123, 'xyz');
+            this.obj[FIRE]('foo', 42, 'abc', 123, 'xyz');
             expect(args).to.equal([ 'boot', 4, 42, 'abc', 123, 'xyz' ]);
 
             args = [];
-            this.obj.fire('foo', 42, 'abc', 123, 'xyz', -12);
+            this.obj[FIRE]('foo', 42, 'abc', 123, 'xyz', -12);
             expect(args).to.equal([ 'boot', 5, 42, 'abc', 123, 'xyz', -12 ]);
         });
 
-        it('should fire event to named listener', function () {
+        it(`should ${FIRE} event to named listener`, function () {
             let arg, that;
 
             let scope = {
@@ -155,13 +229,13 @@ function defineSuite (T) {
 
             this.obj.on('foo', 'fn', scope);
 
-            this.obj.fire('foo', 42);
+            this.obj[FIRE]('foo', 42);
 
             expect(arg).to.be(42);
             expect(that).to.be(scope);
         });
 
-        it('should fire event to one listener w/o scope', function () {
+        it(`should ${FIRE} event to one listener w/o scope`, function () {
             let arg;
             let that = -1;
 
@@ -170,13 +244,13 @@ function defineSuite (T) {
                 that = this;
             });
 
-            this.obj.fire('foo', 42);
+            this.obj[FIRE]('foo', 42);
 
             expect(arg).to.be(42);
             expect(that == null).to.be(true);
         });
 
-        it('should fire event to two listeners', function () {
+        it(`should ${FIRE} event to two listeners`, function () {
             let scope1 = { woot: 'yey' };
             let scope2 = { boot: 'jazz' };
             let args = [];
@@ -192,7 +266,7 @@ function defineSuite (T) {
                 that2 = this;
             }, scope2);
 
-            let ret = this.obj.fire('foo', 42);
+            let ret = this.obj[FIRE]('foo', 42);
 
             expect(ret).to.be(undefined);
             expect(args).to.equal([ 'a=42', 'b=42' ]);
@@ -200,24 +274,7 @@ function defineSuite (T) {
             expect(that2).to.be(scope2);
         });
 
-        it('should respect STOP from first of two listeners', function () {
-            let args = [];
-
-            this.obj.on('foo', function (a) {
-                args.push('a=' + a);
-                return STOP;
-            });
-
-            this.obj.on('foo', function (a) {
-                args.push('b=' + a);
-            });
-
-            let ret = this.obj.fire('foo', 42);
-
-            expect(ret === STOP).to.be(true);
-        });
-
-        it('should fire event twice to one listener', function () {
+        it(`should ${FIRE} event twice to one listener`, function () {
             let scope = { woot: 'yey' };
             let args = [];
             let that = [];
@@ -227,8 +284,8 @@ function defineSuite (T) {
                 that.push(this);
             }, scope);
 
-            this.obj.fire('foo', 42);
-            this.obj.fire('foo', 427);
+            this.obj[FIRE]('foo', 42);
+            this.obj[FIRE]('foo', 427);
 
             expect(args).to.equal([ 'a=42', 'a=427' ]);
             expect(that).to.have.length(2);
@@ -236,7 +293,7 @@ function defineSuite (T) {
             expect(that[1]).to.be(scope);
         });
 
-        it('should fire event twice to two listeners', function () {
+        it(`should ${FIRE} event twice to two listeners`, function () {
             let scope1 = { woot: 'yey' };
             let scope2 = { boot: 'jazz' };
             let args = [];
@@ -252,8 +309,8 @@ function defineSuite (T) {
                 that.push(this);
             }, scope2);
 
-            this.obj.fire('foo', 42);
-            this.obj.fire('foo', 427);
+            this.obj[FIRE]('foo', 42);
+            this.obj[FIRE]('foo', 427);
 
             expect(args).to.equal([ 'a=42', 'b=42', 'a=427', 'b=427' ]);
             expect(that.length).to.be(4);
@@ -263,6 +320,42 @@ function defineSuite (T) {
             expect(that[3]).to.be(scope2);
         });
 
+        describe('STOP', function () {
+            it(`should return STOP from one listener`, function () {
+                let args = [];
+
+                this.obj.on('foo', function (a) {
+                    args.push('a=' + a);
+                    return STOP;
+                });
+
+                let ret = this.obj[FIRE]('foo', 42);
+
+                expect(args).to.equal([ 'a=42' ]);
+                expect(ret === STOP).to.be(true);
+            });
+
+            it(`should respect STOP from first of two listeners`, function () {
+                let args = [];
+
+                this.obj.on('foo', function (a) {
+                    args.push('a=' + a);
+                    return STOP;
+                });
+
+                this.obj.on('foo', function (a) {
+                    args.push('b=' + a);
+                });
+
+                let ret = this.obj[FIRE]('foo', 42);
+
+                expect(args).to.equal([ 'a=42' ]);
+                expect(ret === STOP).to.be(true);
+            });
+        });
+    })});
+
+    describe('notification', function () {
         it('should inform of watcher transitions', function () {
             let unwatching = [];
             let watching = [];
@@ -273,49 +366,57 @@ function defineSuite (T) {
             this.obj.onEventUnwatch = name => unwatching.push(name);
 
             expect(this.obj.hasListeners('foo')).to.be(false);
+            expect(hasListeners(this.obj, 'foo')).to.be(false);
 
             // 0 --> 1 --> 0
             this.obj.on('foo', f);
             expect(unwatching).to.equal([ ]);
             expect(watching).to.equal([ 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(true);
+            expect(hasListeners(this.obj, 'foo')).to.be(true);
 
             this.obj.un('foo', f);
             expect(unwatching).to.equal([ 'foo' ]);
             expect(watching).to.equal([ 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(false);
+            expect(hasListeners(this.obj, 'foo')).to.be(false);
 
             // 0 --> 1 --> 2
             this.obj.on('foo', f);
             expect(unwatching).to.equal([ 'foo' ]);
             expect(watching).to.equal([ 'foo', 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(true);
+            expect(hasListeners(this.obj, 'foo')).to.be(true);
 
             this.obj.on('foo', f2);
             expect(unwatching).to.equal([ 'foo' ]);
             expect(watching).to.equal([ 'foo', 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(true);
+            expect(hasListeners(this.obj, 'foo')).to.be(true);
 
             // 2 --> 1 --> 0
             this.obj.un('foo', f);
             expect(unwatching).to.equal([ 'foo' ]);
             expect(watching).to.equal([ 'foo', 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(true);
+            expect(hasListeners(this.obj, 'foo')).to.be(true);
 
             this.obj.un('foo', f2);
             expect(unwatching).to.equal([ 'foo', 'foo' ]);
             expect(watching).to.equal([ 'foo', 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(false);
+            expect(hasListeners(this.obj, 'foo')).to.be(false);
 
             // 2 --> 1 --> 0 --> 1
             this.obj.on('foo', f);
             expect(unwatching).to.equal([ 'foo', 'foo' ]);
             expect(watching).to.equal([ 'foo', 'foo', 'foo' ]);
             expect(this.obj.hasListeners('foo')).to.be(true);
+            expect(hasListeners(this.obj, 'foo')).to.be(true);
         });
     });
 
-    describe('un', function () {
+    ['un', 'off'].forEach(UN => { describe(`${UN} method`, function () {
         it('should remove one listener', function () {
             let called = false;
 
@@ -347,25 +448,25 @@ function defineSuite (T) {
 
             this.obj.on('foo', 'fn', scope);
 
-            this.obj.un('foo', 'fn', {});  // listener has no scope
+            this.obj[UN]('foo', 'fn', {});  // listener has no scope
             this.obj.fire('foo');
             expect(called).to.be(true);
 
             called = false;
 
-            this.obj.un('foo', 'fn');
+            this.obj[UN]('foo', 'fn');
             this.obj.fire('foo');
             expect(called).to.be(true);
 
             called = false;
 
-            this.obj.un('foo', scope.fn);
+            this.obj[UN]('foo', scope.fn);
             this.obj.fire('foo');
             expect(called).to.be(true);
 
             called = false;
 
-            this.obj.un('foo', 'fn', scope);
+            this.obj[UN]('foo', 'fn', scope);
             this.obj.fire('foo');
             expect(called).to.be(false);
         });
@@ -384,22 +485,22 @@ function defineSuite (T) {
             this.obj.on('foo', a);
             this.obj.on('foo', b);
 
-            this.obj.un('foo', a, {});  // listener has no scope
-            this.obj.un('foo', b, {});  // listener has no scope
+            this.obj[UN]('foo', a, {});  // listener has no scope
+            this.obj[UN]('foo', b, {});  // listener has no scope
             this.obj.fire('foo');
             expect(calledA).to.be(true);
             expect(calledB).to.be(true);
 
             calledA = calledB = false;
 
-            this.obj.un('foo', a);
+            this.obj[UN]('foo', a);
             this.obj.fire('foo');
             expect(calledA).to.be(false);
             expect(calledB).to.be(true);
 
             calledA = calledB = false;
 
-            this.obj.un('foo', b);
+            this.obj[UN]('foo', b);
             this.obj.fire('foo');
             expect(calledA).to.be(false);
             expect(calledB).to.be(false);
@@ -429,7 +530,7 @@ function defineSuite (T) {
 
             this.obj.on('foo', fn, scope);
 
-            this.obj.un('foo', fn, scope);
+            this.obj[UN]('foo', fn, scope);
 
             this.obj.fire('foo');
 
@@ -446,17 +547,62 @@ function defineSuite (T) {
 
             this.obj.on('foo', fn, scope);
 
-            this.obj.un('foo', fn, {});  // wrong scope
+            this.obj[UN]('foo', fn, {});  // wrong scope
             this.obj.fire('foo');
             expect(called).to.be(true);
 
             called = false;
 
-            this.obj.un('foo', fn);  // no scope
+            this.obj[UN]('foo', fn);  // no scope
             this.obj.fire('foo');
             expect(called).to.be(true);
         });
-    });
+    })});
+
+    [false, true].forEach(FN => { describe(`unAll ${FN ? 'function' : 'instance method'}`, function () {
+        it('should work with no listeners', function () {
+            if (FN) {
+                unAll(this.obj);
+            }
+            else {
+                this.obj.unAll();
+            }
+        });
+
+        it('should remove all listeners', function () {
+            let calls = [];
+
+            this.obj.on({
+                foo (x) {
+                    calls.push('a=' + x);
+                },
+                bar (x) {
+                    calls.push('b=' + x);
+                }
+            });
+
+            this.obj.on('foo', x => calls.push('c=' + x));
+
+            this.obj.fire('foo', 123);
+            expect(calls).to.equal([ 'a=123', 'c=123' ]);
+
+            this.obj.fire('bar', 321);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+
+            if (FN) {
+                unAll(this.obj);
+            }
+            else {
+                this.obj.unAll();
+            }
+
+            this.obj.fire('foo', 123);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+
+            this.obj.fire('bar', 321);
+            expect(calls).to.equal([ 'a=123', 'c=123', 'b=321' ]);
+        });
+    })});
 
     describe('once', function () {
         it('should cleanup a once listener', function () {
@@ -742,6 +888,32 @@ function defineSuite (T) {
             expect(bar).to.equal([ ]);
         });
 
+        it('should remove all listeners on close', function () {
+            let foo = [];
+            let bar = [];
+
+            let token = this.obj.on({
+                foo (a) {
+                    foo.push(a);
+                },
+                bar (a) {
+                    bar.push(a);
+                }
+            });
+
+            this.obj.on('foo', v => foo.push('a=' + v));
+
+            token.close();  // close is to mimic event-emitter pipes
+
+            this.obj.fire('foo', 42);
+            expect(foo).to.equal([ 'a=42' ]);
+            expect(bar).to.equal([ ]);
+
+            this.obj.fire('bar', 427);
+            expect(foo).to.equal([ 'a=42' ]);
+            expect(bar).to.equal([ ]);
+        });
+
         it('should remove all listeners on destroy', function () {
             let foo = [];
             let bar = [];
@@ -766,6 +938,53 @@ function defineSuite (T) {
             this.obj.fire('bar', 427);
             expect(foo).to.equal([ 'a=42' ]);
             expect(bar).to.equal([ ]);
+        });
+
+        it('should remove only remaining listeners on destroy', function () {
+            let foo = [];
+            let bar = [];
+            let zip = [];
+            let manifest = {
+                foo (a) {
+                    foo.push(a);
+                },
+                bar (a) {
+                    bar.push(a);
+                },
+                zip (a) {
+                    zip.push(a);
+                }
+            };
+
+            let token = this.obj.on(manifest);
+
+            // remove "foo" listener and replace with another
+            this.obj.un('foo', manifest.foo);
+            this.obj.on('foo', v => foo.push('a=' + v));
+
+            // remove "bar" listeners and replace with multiple:
+            this.obj.un('bar', manifest.bar);
+            this.obj.on('bar', v => bar.push('b=' + v));
+            this.obj.on('bar', v => bar.push('c=' + v));
+
+            // remove "zip" and do not add any
+            this.obj.un('zip', manifest.zip);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42);
+            expect(foo).to.equal([ 'a=42' ]);
+            expect(bar).to.equal([ ]);
+            expect(zip).to.equal([ ]);
+
+            this.obj.fire('bar', 123);
+            expect(bar).to.equal([ 'b=123', 'c=123' ]);
+            expect(foo).to.equal([ 'a=42' ]);
+
+            this.obj.fire('zip', 427);
+            expect(zip).to.equal([ ]);
+            expect(bar).to.equal([ 'b=123', 'c=123' ]);
+            expect(foo).to.equal([ 'a=42' ]);
         });
 
         it('should remove all listeners w/scope on destroy', function () {

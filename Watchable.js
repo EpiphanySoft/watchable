@@ -25,32 +25,30 @@ class Token {
         let watcherMap = instance[watchersSym];
         let listener, index, name, watchers;
 
-        if (watcherMap) {
-            for (listener of this.listeners) {
-                watchers = watcherMap[name = listener[3]];
+        for (listener of this.listeners) {
+            watchers = watcherMap[name = listener[3]];
 
-                if (watchers && firingSym in watchers) {
-                    if ((index = watchers.indexOf(listener)) > -1) {
-                        if (watchers[firingSym]) {
-                            watcherMap[name] = watchers = watchers.slice();
-                            watchers[firingSym] = 0;
-                        }
+            if (watchers && firingSym in watchers) {
+                if ((index = watchers.indexOf(listener)) > -1) {
+                    if (watchers[firingSym]) {
+                        watcherMap[name] = watchers = watchers.slice();
+                        watchers[firingSym] = 0;
+                    }
 
-                        if (watchers.length > 1) {
-                            watchers.splice(index, 1);
-                        }
-                        else {
-                            watcherMap[name] = null;
-                        }
+                    if (watchers.length > 1) {
+                        watchers.splice(index, 1);
+                    }
+                    else {
+                        watcherMap[name] = null;
                     }
                 }
-                else if (watchers === listener) {
-                    watcherMap[name] = null;
-                }
+            }
+            else if (watchers === listener) {
+                watcherMap[name] = null;
+            }
 
-                if (instance.onEventUnwatch && !watcherMap[name]) {
-                    instance.onEventUnwatch(name);
-                }
+            if (instance.onEventUnwatch && !watcherMap[name]) {
+                instance.onEventUnwatch(name);
             }
         }
     }
@@ -298,13 +296,15 @@ class Watchable {
     unAll (event) {
         let watcherMap = this[watchersSym];
 
-        if (!event) {
-            for (let key of watcherMap) {
-                watcherMap[key] = null;
+        if (watcherMap) {
+            if (!event) {
+                for (let key in watcherMap) {
+                    watcherMap[key] = null;
+                }
             }
-        }
-        else if (watcherMap[event]) {
-            watcherMap[event] = null;
+            else if (watcherMap[event]) {
+                watcherMap[event] = null;
+            }
         }
 
         return this;
