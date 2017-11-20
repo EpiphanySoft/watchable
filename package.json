@@ -1,6 +1,6 @@
 {
   "name": "@epiphanysoft/watchable",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Simple event firing ES6 class",
   "author": "Don Griffin (dongryphon)",
   "license": "MIT",

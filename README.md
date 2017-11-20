@@ -37,21 +37,9 @@ Or clone from GitHub.
 
 # Usage
 
-You can generally drop in `watchable` as an enhanced `event-emiiter` module:
-
-```javascript
-    const watchable = require('@epiphanysoft/watchable');
-    
-    function MyClass () { /* ... */ }
-    
-    watchable(MyClass.prototype);
-    
-    let inst = new MyClass();
-    
-    // ... use inst.on(), inst.off(), inst.once() and inst.emit()
-```
-There are some minor differences in how the extra utilities work (such as `pipe`,
-`unify`, `all-off` and `has-listeners`).
+You can generally drop in `watchable` as an enhanced `event-emiiter` module. There are
+some minor differences in how the extra utilities work (such as `pipe`, `unify`, `all-off`
+and `has-listeners`).
 
 The `event-emitter` API is based on ES5 "classes", but `watchable` exports a proper ES6
 class. Also, as with `event-emitter`, you can just create instances and use them directly. 
@@ -117,6 +105,24 @@ The `Watchable` class can also be created and configured directly:
 
 The config object passed to the `constructor` will be explained as the individual properties
 are explored below.
+
+## Replacing `event-emitter`
+
+The following form is one suggested for `event-emitter` and is supported by `watchable`:
+
+```javascript
+    const watchable = require('@epiphanysoft/watchable');
+    
+    function MyClass () { /* ... */ }
+    
+    watchable(MyClass.prototype);
+    
+    let inst = new MyClass();
+    
+    // ... use inst.on(), inst.off(), inst.once() and inst.emit()
+```
+While this form is less elegant and not recommended when using `watchable`, it is supported
+to allow as simple as possible migration for existing projects.
 
 ## Listener Methods
 
