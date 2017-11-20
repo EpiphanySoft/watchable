@@ -1,3 +1,8 @@
-/Watchable.iml
-node_modules
+/.idea/dictionaries/don.xml
+/.idea/watchable.iml
+/.idea/modules.xml
+/.idea/workspace.xml
+
 /.nyc_output
+
+node_modules
