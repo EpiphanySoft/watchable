@@ -48,14 +48,19 @@ class. Also, as with `event-emitter`, you can just create instances and use them
 
 A summary of the `Watchable` API:
 
- - ES6 base class
- - Configurable instances
- - Listener methods (not just functions)
- - Add/Remove multiple event listeners in one call
- - Dynamic scope resolution
- - Notification when adding first listener to an event
- - Notification when removing last listener to an event
- - Flexible event relaying
+ - [ES6 base class](#_baseClass)
+ - [Configurable instances](#_instances)
+ - [Close match to `event-emitter`](#_substitution)
+ - [Listener methods (not just functions)](#_listenerMethods)
+ - [Add/Remove multiple event listeners in one call](#_multiListen)
+ - [Dynamic scope resolution](#_scopes)
+ - [Detect if listeners are registered for an event](#_notification)
+ - [Notification when adding first (or removing last) listener to an event](#_notification)
+ - [Flexible event relaying](#_relaying)
+ - [Configurable event logging](#_logging) (new in 1.1)
+ - [Utility methods](#_utils)
+
+<a name="_baseClass">
 
 ## Watchable Base Class
 
@@ -83,6 +88,8 @@ The `Watchable` class is a proper ES6 class from which you can derive:
 The use of `un()` instead of `off()` and `fire()` instead of `emit()` is a matter of
 preference since both are supported. 
 
+<a name="_instances">
+
 ## Configurable Instance
 
 The `Watchable` class can also be created and configured directly:
@@ -106,6 +113,8 @@ The `Watchable` class can also be created and configured directly:
 The config object passed to the `constructor` will be explained as the individual properties
 are explored below.
 
+<a name="_substitution">
+
 ## Replacing `event-emitter`
 
 The following form is one suggested for `event-emitter` and is supported by `watchable`:
@@ -123,6 +132,8 @@ The following form is one suggested for `event-emitter` and is supported by `wat
 ```
 While this form is less elegant and not recommended when using `watchable`, it is supported
 to allow as simple as possible migration for existing projects.
+
+<a name="_listenerMethods">
 
 ## Listener Methods
 
@@ -161,6 +172,8 @@ To remove a listener method you must supply the same instance:
 ```javascript
     watchable.un('foo', 'onFoo', watcher);
 ```
+
+<a name="_multiListen">
 
 ## Multiple Listeners
 
@@ -228,6 +241,8 @@ There is also the `unAll` method which removes all listeners from a watchable in
     watchable.unAll();
 ```
 
+<a name="_scopes">
+
 ## Scope Resolution
 
 When using listener methods, it can be convenient to have a default or named scope.
@@ -291,6 +306,8 @@ Basically, `watchable` treats the `listeners` as the array it is and so long as 
 onto the object is preserved and handled as read-only, the `resolveListenerScope`
 implementor is free to place expando properties on the same object for its own benefit.
 
+<a name="_notification">
+
 ## Listener Detection and Notification
 
 Some expensive actions can be avoided using the `hasListeners` method:
@@ -338,6 +355,8 @@ are implemented.
 
 When configuring a `Watchable` instance, the `onWatch` and `onUnwatch` properties of the
 config object set the `onEventWatch` and `onEventUnwatch` methods, respectively.
+
+<a name="_relaying">
 
 ## Relaying Events
 
@@ -502,7 +521,7 @@ the first and only parameter to `relayEvents`:
         }
         
         relay (event, args) {
-            //...
+            //... called for all events fired
         }
     }
 
@@ -510,9 +529,205 @@ the first and only parameter to `relayEvents`:
 ```
 
 In this case, `watchable1` will call the `relay()` method for all events it fires. The
-`relay` method can then decide the particulars. All of the features described above can
-be leveraged by calling `super.relay()` as long as the `constructor` passes the `options`
-object to its `super()`.
+`relay` method can then decide the particulars.
+
+The filtering and renaming features described above can be leveraged by instead
+implementing `doRelay` (as long as the `constructor` passes the `options` object to its
+`super()`):
+
+```javascript
+    const { Relayer } = require('@epiphanysoft/watchable/relay');
+
+    class MyRelayer extends Relayer {
+        constructor (target) {
+            super();
+            this.target = target;
+        }
+        
+        doRelay (event, args) {
+            // ... called only for events that should be relayed
+            // ... and with the potentially renamed event
+            this.target.fire(event, ...args);
+        }
+    }
+
+    watchable1.relayEvents(new MyRelayer(watchable2));
+```
+
+<a name="_logging">
+
+## Event Logging
+
+Logging is a special form of relaying that (by default) logs events to the `console`:
+
+```javascript
+    const logEvents = require('@epiphanysoft/watchable/log');
+
+    logEvents(watchable);
+    
+    watchable.fire('foo', 42, 'abc');
+```
+
+The above will generate `console.log()` calls for all events fired by the `watchable`:
+
+    > foo 42 "abc"
+
+There are also `logOptions` that can be specified:
+
+ - `level`
+ - `mask`
+ - `prefix`
+ - `to`
+
+### Using `level`
+
+By default, events are logged using `console.log()`. Some events, however, may be more
+appropriate to log using `console.error()` or other "level" method. This is handled by
+specifying a `level` option:
+
+```javascript
+    logEvents(watchable, {
+        level: {
+            foo: 'error'
+        }
+    });
+    
+    watchable.fire('foo', 42, 'abc');
+```
+
+Given the above `logEvents()` call, all events will still use `console.log()` except for
+the `foo` event. This event will use `console.error()`. Instead of `'error'`, the value
+of the properties in the `level` object are any `console` API that is callably equivalent
+to `console.log()` and `console.error()`. For example, `'warn'` and `'info'`.
+
+### Using `mask`
+
+In some cases, perhaps only the event name should be logged, or maybe certain event
+arguments are just noise in the log. The `mask` option can be used to tune the output for
+all events or on a per-event basis: 
+
+```javascript
+    logEvents(watchable, {
+        mask: 0b011
+    });
+    
+    watchable.fire('foo', 42, 'abc', window);
+```
+
+The value of the `mask` is a number whose bits are matched to the arguments. The least
+significant bit controls `arguments[0]`, the next least bit controls `arguments[1]` and
+so on. In the above `0b011` (an ES6 binary literal) has the two least significant bits set
+and so only the first two arguments will be logged:
+
+    > foo 42 'abc'
+
+A `mask` of `0` will prevent all argument logging. To assign a `mask` value based on the
+event name, `mask` can be an object:
+
+```javascript
+    logEvents(watchable, {
+        mask: {
+            '*': 0,
+            foo: 0b011
+        }
+    });
+```
+
+In the above case, the default mask (using the `'*'` key) is `0` while `foo` events have
+a value of `0b011`. When `mask` is a number, it is equivalent to an object with `'*'` as
+the only key holding that value.
+
+### Using `prefix`
+
+To make logged events more readable, each line can be decorated with a `prefix`:
+
+```javascript
+    logEvents(watchable, {
+        prefix: 'w1:'
+    });
+    
+    watchable.fire('foo', 42, 'abc');
+```
+
+Using `prefix` each call to `console.log()` will be more explicit:
+
+    > w1:foo 42 "abc"
+
+### Using `to`
+
+Unit tests and the like can benefit by logging to an array:
+
+```javascript
+    let events = [];
+
+    logEvents(watchable, events);
+    
+    watchable.fire('foo', 42, 'abc');
+    
+    expect(events).to.equal([
+        [ 'foo', [ 42, 'abc' ]]
+    ]);
+```
+
+To combine other options, the array can be passed as the `to` property:
+
+```javascript
+    let events = [];
+
+    logEvents(watchable1, {
+        prefix: 'w1:',
+        to: events
+    });
+    logEvents(watchable2, {
+        prefix: 'w2:',
+        to: events
+    });
+    
+    watchable1.fire('foo', 42, 'abc');
+    watchable2.fire('foo', 42, 'abc');
+    
+    expect(events).to.equal([
+        [ 'w1:foo', [ 42, 'abc' ]],
+        [ 'w2:foo', [ 42, 'abc' ]]
+    ]);
+```
+
+The above `expect` checks use [assertly](https://www.npmjs.com/package/assertly) but, of
+course, other assertion frameworks can compare arrays in a similar manner.
+
+### Other Relaying Options
+
+In addition to the logger options above, normal [event relayer](#_relaying) options can
+be passed as a 3rd argument:
+
+```javascript
+    let events = [];
+
+    logEvents(watchable, events, {
+        foo: 'FOO'
+    });
+    
+    watchable.fire('foo', 42, 'abc');
+    
+    expect(events).to.equal([
+        [ 'FOO', [ 42, 'abc' ]]
+    ]);
+```
+
+### Stopping Logs
+
+The `logEvents` method returns token that can be used to stop logging (like a normal
+event relayer):
+
+```javascript
+    let token = logEvents(watchable);
+    
+    watchable.fire('foo', 42, 'abc');
+    
+    token.destroy();  // no more logging
+```
+
+<a name="_utils">
 
 ## Utility Methods
 
@@ -619,6 +834,40 @@ modules to verify compliance with the full `watchable` interface contract:
         watchableTestSuite(MyWatchable);
     });
 ```
+
+## Design Goals
+
+If you have ideas, I am wide open to hear them. Some things to keep in mind when deciding
+if an idea belongs in `watchable` proper (or separate module) are sketched out in this
+section.
+
+### Small Module Size
+
+While there many features in the `watchable` module, the core (as of 1.1.0) is only about
+350 lines of code. The most advanced features (like `unify`, relaying and logging) are all
+implemented as "sub-modules" (separately required files in the same `npm` module).
+
+### Elegant API
+
+As much as possible, the `watchable` API tries to behave "intuitively". This means that
+when a call signature looks intuitive, `watchable` tries to support it. This principal
+can be seen in the `on()` method and its support for these call signatures:
+
+```javascript
+    watchable.on('foo', x => { /* ... */ });
+
+    watchable.on({
+        foo (x) {
+            /* ... */
+        }
+    });
+```
+
+### Compatibility with `event-emitter`
+
+The `event-emitter` module is the de facto standard for this type of problem, so while the
+API can be extended and improved, `watchable` strives to be as close as possible to a
+drop-in replacement.
 
 # License
 

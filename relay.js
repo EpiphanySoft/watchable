@@ -11,7 +11,7 @@ class Relayer {
         let relay = target;
 
         if (!target || !target.isEventRelayer) {
-            relay = new Relayer(options);
+            relay = new this(options);
             relay.target = target;
         }
 
@@ -71,11 +71,11 @@ class Relayer {
         }
     }
 
-    close () {
-        this.destroy();
+    destroy () {
+        this.close();
     }
 
-    destroy () {
+    close () {
         let source = this.source;
         let relayers = source[relayersSym];
         let index = indexOf(relayers, this);
@@ -90,12 +90,16 @@ class Relayer {
         }
     }
 
+    doRelay (event, args) {
+        this.target.fire(event, ...args);
+    }
+
     relay (event, args) {
         let map = this.map;
         let entry, ret;
 
         if (!map) {
-            ret = this.target.fire(event, ...args);
+            ret = this.doRelay(event, args);
         }
         else {
             entry = (event in map) ? map[event] : map['*'];
@@ -105,7 +109,7 @@ class Relayer {
                     ret = entry.call(this, event, args);
                 }
                 else {
-                    ret = this.target.fire((entry === true) ? event : entry, ...args);
+                    ret = this.doRelay((entry === true) ? event : entry, args);
                 }
             }
         }
@@ -118,10 +122,11 @@ Relayer.prototype.isEventRelayer = true;
 
 Watchable.Relayer = Relayer;
 
-function relay (watchable1, watchable2, options) {
+function relayEvents (watchable1, watchable2, options) {
     return Relayer.create(watchable1, watchable2, options);
 }
 
-relay.Relayer = Relayer;
+relayEvents.Relayer = Relayer;
+relayEvents.relayEvents = relayEvents;
 
-module.exports = relay;
+module.exports = relayEvents;

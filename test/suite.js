@@ -8,6 +8,8 @@ const unify = require('../unify.js');
 const relayEvents = require('../relay.js');  // enable relayEvents() method
 const { Relayer } = relayEvents;
 
+const { logEvents, Logger } = require('../log.js');
+
 function defineSuite (T) {
     let K = 0;
 
@@ -1632,6 +1634,449 @@ function defineSuite (T) {
             this.obj[symbols.relayers] = null;
 
             token.destroy();
+        });
+    }); // event relay
+
+    describe('logging', function () {
+        it('should log to array', function () {
+            const events = [];
+
+            logEvents(this.obj, events);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(events).to.equal([
+                'foo: 42, "abc"',
+                'bar: "xyz", 3',
+                'zap'
+            ]);
+        });
+
+        it('should log to array w/prefix', function () {
+            const events = [];
+
+            logEvents(this.obj, {
+                prefix: 'derp.',
+                to: events
+            });
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(events).to.equal([
+                'derp.foo: 42, "abc"',
+                'derp.bar: "xyz", 3',
+                'derp.zap'
+            ]);
+        });
+
+        it('should log to array w/mask', function () {
+            const events = [];
+
+            logEvents(this.obj, {
+                mask: 0b01,
+                to: events
+            });
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(events).to.equal([
+                'foo: 42',
+                'bar: "xyz"',
+                'zap'
+            ]);
+        });
+
+        it('should log to array w/formatter', function () {
+            const events = [];
+
+            logEvents(this.obj, {
+                to: events,
+                format (a) {
+                    return (typeof a === 'string') ? JSON.stringify(a.toUpperCase()) : a;
+                }
+            });
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(events).to.equal([
+                'foo: 42, "ABC"',
+                'bar: "XYZ", 3',
+                'zap'
+            ]);
+        });
+
+        it('should log to a basic logger', function () {
+            const logger = {
+                events: [],
+
+                log (event, ...args) {
+                    this.events.push([ event, args ]);
+                }
+            };
+
+            logEvents(this.obj, logger);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'foo', [ 42, 'abc' ] ],
+                [ 'bar', [ 'xyz', 3 ] ],
+                [ 'zap', [] ]
+            ]);
+        });
+
+        it('should log to a basic logger until destroyed', function () {
+            const logger = {
+                events: [],
+
+                log (event, ...args) {
+                    this.events.push([ event, args ]);
+                }
+            };
+
+            let token = logEvents(this.obj, logger);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'foo', [ 42, 'abc' ] ],
+                [ 'bar', [ 'xyz', 3 ] ],
+                [ 'zap', [] ]
+            ]);
+
+            token.destroy();
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'foo', [ 42, 'abc' ] ],
+                [ 'bar', [ 'xyz', 3 ] ],
+                [ 'zap', [] ]
+            ]);
+        });
+
+        it('should log to a basic logger w/prefix', function () {
+            const logger = {
+                events: [],
+                prefix: '> ',
+
+                log (event, ...args) {
+                    this.events.push([ event, args ]);
+                }
+            };
+
+            logEvents(this.obj, logger);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ '> foo', [ 42, 'abc' ] ],
+                [ '> bar', [ 'xyz', 3 ] ],
+                [ '> zap', [] ]
+            ]);
+        });
+
+        it('should log to a basic logger w/level', function () {
+            const logger = {
+                events: [],
+                level: {
+                    foo: 'error'
+                },
+
+                error (event, ...args) {
+                    this.events.push([ 'E', event, args ]);
+                },
+
+                log (event, ...args) {
+                    this.events.push([ 'L', event, args ]);
+                }
+            };
+
+            logEvents(this.obj, logger);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'E', 'foo', [ 42, 'abc' ] ],
+                [ 'L', 'bar', [ 'xyz', 3 ] ],
+                [ 'L', 'zap', [] ]
+            ]);
+        });
+
+        it('should log to a basic logger w/mask', function () {
+            const logger = {
+                events: [],
+                mask: 0b01,
+
+                log (event, ...args) {
+                    this.events.push([ event, args ]);
+                }
+            };
+
+            logEvents(this.obj, logger);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'foo', [ 42 ] ],
+                [ 'bar', [ 'xyz' ] ],
+                [ 'zap', [] ]
+            ]);
+        });
+
+        it('should log to a basic logger w/relayOptions', function () {
+            const logger = {
+                events: [],
+
+                log (event, ...args) {
+                    this.events.push([ event, args ]);
+                }
+            };
+
+            logEvents(this.obj, logger, [ 'foo', 'bar' ]);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'foo', [ 42, 'abc' ] ],
+                [ 'bar', [ 'xyz', 3 ] ]
+            ]);
+        });
+
+        it('should log to a basic logger w/relayOptions and mask', function () {
+            const logger = {
+                events: [],
+                mask: 0b01,
+
+                log (event, ...args) {
+                    this.events.push([ event, args ]);
+                }
+            };
+
+            logEvents(this.obj, logger, [ 'foo', 'bar' ]);
+
+            this.obj.fire('foo', 42, 'abc');
+            this.obj.fire('bar', 'xyz', 3);
+            this.obj.fire('zap');
+
+            expect(logger.events).to.equal([
+                [ 'foo', [ 42 ] ],
+                [ 'bar', [ 'xyz' ] ]
+            ]);
+        });
+
+        describe('default logger', function () {
+            beforeEach(function () {
+                this.org = Logger.prototype.out;
+
+                this.events = [];
+                Logger.prototype.out = {
+                    error: (event, ...args) => {
+                        this.events.push([ 'E:' + event, args ]);
+                    },
+                    info: (event, ...args) => {
+                        this.events.push([ 'I:' + event, args ]);
+                    },
+                    log: (event, ...args) => {
+                        this.events.push([ event, args ]);
+                    },
+                    warn: (event, ...args) => {
+                        this.events.push([ 'W:' + event, args ]);
+                    }
+                };
+            });
+
+            afterEach(function () {
+                Logger.prototype.out = this.org;
+            });
+
+            it('should construct w/o options', function () {
+                logEvents(this.obj);
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 42, 'abc' ] ],
+                    [ 'bar', [ 'xyz', 3 ] ],
+                    [ 'zap', [] ]
+                ]);
+            });
+
+            it('should stop logging on destroy', function () {
+                let token = logEvents(this.obj);
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 42, 'abc' ] ],
+                    [ 'bar', [ 'xyz', 3 ] ],
+                    [ 'zap', [] ]
+                ]);
+
+                token.destroy();
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 42, 'abc' ] ],
+                    [ 'bar', [ 'xyz', 3 ] ],
+                    [ 'zap', [] ]
+                ]);
+            });
+
+            it('should construct w/level', function () {
+                logEvents(this.obj, {
+                    level: {
+                        foo: 'info',
+                        bar: 'warn',
+                        zap: 'error'
+                    }
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+                this.obj.fire('derp', 123);
+
+                expect(this.events).to.equal([
+                    [ 'I:foo', [ 42, 'abc' ] ],
+                    [ 'W:bar', [ 'xyz', 3 ] ],
+                    [ 'E:zap', [] ],
+                    [ 'derp', [ 123 ]]
+                ]);
+            });
+
+            it('should construct w/mask', function () {
+                logEvents(this.obj, {
+                    mask: 0b10,
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 'abc' ] ],
+                    [ 'bar', [ 3 ] ],
+                    [ 'zap', [] ]
+                ]);
+            });
+
+            it('should construct w/mask object', function () {
+                logEvents(this.obj, {
+                    mask: {
+                        foo: 0b10,
+                        bar: 0b01
+                    },
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 'abc' ] ],
+                    [ 'bar', [ 'xyz' ] ],
+                    [ 'zap', [] ]
+                ]);
+            });
+
+            it('should construct w/mask object using wildcard', function () {
+                logEvents(this.obj, {
+                    mask: {
+                        '*': 0b10,
+                        bar: 0b01
+                    },
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 'abc' ] ],
+                    [ 'bar', [ 'xyz' ] ],
+                    [ 'zap', [] ]
+                ]);
+            });
+
+            it('should construct w/prefix', function () {
+                logEvents(this.obj, {
+                    mask: 0b10,
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 'abc' ] ],
+                    [ 'bar', [ 3 ] ],
+                    [ 'zap', [] ]
+                ]);
+            });
+
+            it('should construct w/relayOptions', function () {
+                logEvents(this.obj, null, {
+                    foo: true,
+                    bar: 'BAR'
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 42, 'abc' ] ],
+                    [ 'BAR', [ 'xyz', 3 ] ]
+                ]);
+            });
+
+            it('should construct w/relayOptions and mask', function () {
+                logEvents(this.obj, {
+                    mask: 0b10,
+                }, {
+                    foo: true,
+                    bar: 'BAR'
+                });
+
+                this.obj.fire('foo', 42, 'abc');
+                this.obj.fire('bar', 'xyz', 3);
+                this.obj.fire('zap');
+
+                expect(this.events).to.equal([
+                    [ 'foo', [ 'abc' ] ],
+                    [ 'BAR', [ 3 ] ]
+                ]);
+            });
         });
     });
 
